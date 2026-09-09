@@ -48,6 +48,12 @@ const defaultSchedule = `3월 15일/ 버스킹 정기 라이브
 전문 스튜디오 음원 녹음 체험
 개별 보컬/악기 파일 제공`
 
+// 1. 구글 드라이브 링크에서 파일 ID 추출하는 유틸리티 함수 추가
+function extractGoogleDriveId(url: string): string | null {
+  const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/)
+  return match ? match[1] : null
+}
+
 // 유틸리티: 유튜브 URL에서 Video ID 추출
 function extractYouTubeId(url: string): string | null {
   const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/
@@ -55,12 +61,13 @@ function extractYouTubeId(url: string): string | null {
   return match && match[2].length === 11 ? match[2] : null
 }
 
-// 유틸리티: 이미지 URL 판단
+// 2. 유틸리티: 이미지 URL 판단 (구글 드라이브 링크 포함하도록 확장)
 function isImageUrl(url: string): boolean {
   return (
     /\.(jpeg|jpg|gif|png|webp)$/i.test(url) ||
     url.includes('images.unsplash.com') ||
-    url.includes('imgur.com')
+    url.includes('imgur.com') ||
+    url.includes('drive.google.com') // 구글 드라이브 주소 감지
   )
 }
 
@@ -361,7 +368,7 @@ function App() {
     )
   }
 
-  // 본문 텍스트 내 링크(유튜브, 이미지) 파싱 및 유튜브 URL 지우기
+  // 3. 게시글 파싱 및 렌더링 함수 수정
   const renderPostContent = (postId: string, content: string) => {
     const tokens = content.split(/\s+/)
     const youtubeUrls: string[] = []
@@ -371,13 +378,28 @@ function App() {
       if (extractYouTubeId(token)) {
         youtubeUrls.push(token)
       } else if (isImageUrl(token)) {
-        imageUrls.push(token)
+        // 구글 드라이브 링크인 경우, 직접 이미지 출력이 가능한 URL 형태로 변환
+        if (token.includes('drive.google.com')) {
+          const driveId = extractGoogleDriveId(token)
+          if (driveId) {
+            imageUrls.push(`https://lh3.googleusercontent.com/d/${driveId}`)
+          }
+        } else {
+          imageUrls.push(token)
+        }
       }
     })
 
-    // 유튜브 URL 제거
+    // 본문에서 유튜브 및 이미지 URL 텍스트 지우기 (텍스트가 튀어나오는 현상 방지)
     const youtubeRegex = /(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/[^\s]+/g
-    const cleanContent = content.replace(youtubeRegex, '').trim()
+    const driveRegex = /(https?:\/\/)?drive\.google\.com\/[^\s]+/g
+    const directImgRegex = /(https?:\/\/[^\s]+?\.(?:jpeg|jpg|gif|png|webp))/g
+
+    const cleanContent = content
+      .replace(youtubeRegex, '')
+      .replace(driveRegex, '')
+      .replace(directImgRegex, '')
+      .trim()
 
     const isPlaying = playingPostId === postId
 
@@ -409,7 +431,7 @@ function App() {
                         className="yt-thumbnail"
                       />
                       <button className="play-overlay-btn" type="button">
-                        ▶ 재생하기
+                        ▶ 영상 재생하기
                       </button>
                     </div>
                   )}
@@ -419,7 +441,7 @@ function App() {
           </div>
         )}
 
-        {/* 이미지 영역 */}
+        {/* 이미지 영역 (구글 드라이브 사진 포함) */}
         {imageUrls.length > 0 && (
           <div className="post-images-grid">
             {imageUrls.map((url, idx) => (
