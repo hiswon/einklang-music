@@ -1,184 +1,500 @@
-.counter {
+/* =========================================================
+   Vibe Music Academy - 트렌디 & 반응형 스타일
+   ========================================================= */
+
+:root {
+  --primary-color: #06b6d4;
+  --primary-hover: #0891b2;
+  --primary-gradient: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+  --accent-gradient: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+  --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+  --card-bg: rgba(30, 41, 59, 0.85);
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --radius-lg: 20px;
+  --radius-md: 14px;
+  --radius-sm: 8px;
+}
+
+/* Reset 및 기본 스타일 */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
   font-size: 16px;
-  padding: 5px 10px;
-  border-radius: 5px;
-  color: var(--accent);
-  background: var(--accent-bg);
-  border: 2px solid transparent;
-  transition: border-color 0.3s;
-  margin-bottom: 24px;
-
-  &:hover {
-    border-color: var(--accent-border);
-  }
-  &:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
 }
 
-.hero {
+body {
+  width: 100%;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background: #0f172a;
+  background: var(--bg-gradient);
+  background-attachment: fixed;
+  font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", Roboto, sans-serif;
+  color: var(--text-main);
+  line-height: 1.5;
+}
+
+#root {
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 0.75rem;
+}
+
+/* 1. 헤더 & 배너 */
+.academy-header {
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
+.header-banner {
+  width: 100%;
+  height: 220px;
+  background-size: cover;
+  background-position: center;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
   position: relative;
-
-  .base,
-  .framework,
-  .vite {
-    inset-inline: 0;
-    margin: 0 auto;
-  }
-
-  .base {
-    width: 170px;
-    position: relative;
-    z-index: 0;
-  }
-
-  .framework,
-  .vite {
-    position: absolute;
-  }
-
-  .framework {
-    z-index: 1;
-    top: 34px;
-    height: 28px;
-    transform: perspective(2000px) rotateZ(300deg) rotateX(44deg) rotateY(39deg)
-      scale(1.4);
-  }
-
-  .vite {
-    z-index: 0;
-    top: 107px;
-    height: 26px;
-    width: auto;
-    transform: perspective(2000px) rotateZ(300deg) rotateX(40deg) rotateY(39deg)
-      scale(0.8);
-  }
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
-#center {
+.banner-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(15, 23, 42, 0.95) 10%, rgba(15, 23, 42, 0.4) 100%);
   display: flex;
   flex-direction: column;
-  gap: 25px;
-  place-content: center;
-  place-items: center;
-  flex-grow: 1;
-
-  @media (max-width: 1024px) {
-    padding: 32px 20px 24px;
-    gap: 18px;
-  }
+  justify-content: flex-end;
+  padding: 1.25rem;
 }
 
-#next-steps {
+.badge-neon {
+  align-self: flex-start;
+  background: rgba(6, 182, 212, 0.2);
+  color: #38bdf8;
+  border: 1px solid #06b6d4;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 20px;
+  margin-bottom: 6px;
+  letter-spacing: 0.5px;
+}
+
+.banner-overlay h1 {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #ffffff;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  margin-bottom: 4px;
+}
+
+.subtitle {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+/* 관리자 로그인 바 */
+.admin-bar {
+  margin-top: 8px;
+  text-align: right;
+}
+
+.admin-btn {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 6px 12px;
+  border-radius: 16px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.admin-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+/* 2. 네비게이션 탭 */
+.academy-nav {
   display: flex;
-  border-top: 1px solid var(--border);
+  width: 100%;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.academy-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.academy-nav button {
+  flex: 0 0 auto;
+  padding: 0.7rem 1.1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: var(--card-bg);
+  color: var(--text-muted);
+  border-radius: 24px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 700;
+  backdrop-filter: blur(8px);
+  transition: all 0.2s;
+}
+
+.academy-nav button.active {
+  background: var(--primary-gradient);
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: 0 4px 16px rgba(6, 182, 212, 0.4);
+}
+
+/* 3. 메인 컨텐츠 영역 */
+.tab-content {
+  width: 100%;
+  background: var(--card-bg);
+  padding: 1.25rem 1rem;
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.tab-content h2 {
+  font-size: 1.25rem;
+  color: #ffffff;
+  margin-bottom: 1rem;
+  font-weight: 700;
+}
+
+.content-img {
+  width: 100%;
+  height: auto;
+  max-height: 280px;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  margin-bottom: 1rem;
+}
+
+.text-left {
   text-align: left;
-
-  & > div {
-    flex: 1 1 0;
-    padding: 32px;
-    @media (max-width: 1024px) {
-      padding: 24px 20px;
-    }
-  }
-
-  .icon {
-    margin-bottom: 16px;
-    width: 22px;
-    height: 22px;
-  }
-
-  @media (max-width: 1024px) {
-    flex-direction: column;
-    text-align: center;
-  }
 }
 
-#docs {
-  border-right: 1px solid var(--border);
-
-  @media (max-width: 1024px) {
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-  }
+.desc-text {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  line-height: 1.6;
 }
 
-#next-steps ul {
-  list-style: none;
-  padding: 0;
-  display: flex;
-  gap: 8px;
-  margin: 32px 0 0;
-
-  .logo {
-    height: 18px;
-  }
-
-  a {
-    color: var(--text-h);
-    font-size: 16px;
-    border-radius: 6px;
-    background: var(--social-bg);
-    display: flex;
-    padding: 6px 12px;
-    align-items: center;
-    gap: 8px;
-    text-decoration: none;
-    transition: box-shadow 0.3s;
-
-    &:hover {
-      box-shadow: var(--shadow);
-    }
-    .button-icon {
-      height: 18px;
-      width: 18px;
-    }
-  }
-
-  @media (max-width: 1024px) {
-    margin-top: 20px;
-    flex-wrap: wrap;
-    justify-content: center;
-
-    li {
-      flex: 1 1 calc(50% - 8px);
-    }
-
-    a {
-      width: 100%;
-      justify-content: center;
-      box-sizing: border-box;
-    }
-  }
+.quote-box {
+  margin: 16px 0;
+  line-height: 1.6;
+  color: #38bdf8;
+  background: rgba(6, 182, 212, 0.1);
+  padding: 12px 16px;
+  border-radius: 12px;
+  border-left: 4px solid #06b6d4;
+  font-size: 0.95rem;
 }
 
-#spacer {
-  height: 88px;
-  border-top: 1px solid var(--border);
-  @media (max-width: 1024px) {
-    height: 48px;
-  }
-}
-
-.ticks {
+/* 4. 비디오 컨테이너 */
+.video-container {
   position: relative;
   width: 100%;
+  padding-bottom: 56.25%;
+  height: 0;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  margin-bottom: 1rem;
+}
 
-  &::before,
-  &::after {
-    content: '';
-    position: absolute;
-    top: -4.5px;
-    border: 5px solid transparent;
+.video-container iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+/* 5. 일정 카드 파싱 스타일 */
+.schedule-block-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-top: 1rem;
+}
+
+.date-group-card {
+  width: 100%;
+  background-color: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+}
+
+.date-header {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #38bdf8;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px dashed rgba(56, 189, 248, 0.3);
+}
+
+.date-content-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.detail-badge {
+  display: inline-block;
+  width: 100%;
+  background-color: rgba(30, 41, 59, 0.8);
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  word-break: break-word;
+}
+
+/* 6. 수강 과목 카드 그리드 */
+.course-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.course-card {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.course-card img {
+  width: 100%;
+  height: 160px;
+  object-fit: cover;
+}
+
+.course-info {
+  padding: 1rem;
+}
+
+.course-info h3 {
+  font-size: 1.1rem;
+  color: #38bdf8;
+  margin-bottom: 6px;
+}
+
+.course-info p {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+/* 7. 링크 버튼 섹션 */
+.link-section {
+  margin-top: 1.5rem;
+  text-align: center;
+}
+
+.link-section h3 {
+  font-size: 1.1rem;
+  margin-bottom: 0.75rem;
+  color: #fff;
+}
+
+.link-btn {
+  display: block;
+  width: 100%;
+  padding: 12px 20px;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 0.95rem;
+  border-radius: 24px;
+  text-align: center;
+  margin-bottom: 10px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.link-btn:active {
+  transform: scale(0.98);
+}
+
+.primary-link {
+  background: var(--primary-gradient);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(6, 182, 212, 0.3);
+}
+
+.secondary-link {
+  background: var(--accent-gradient);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(168, 85, 247, 0.3);
+}
+
+/* 8. 관리자 에디터 */
+.admin-editor-box {
+  background-color: rgba(15, 23, 42, 0.9);
+  border: 1px solid #06b6d4;
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  margin-bottom: 1.25rem;
+}
+
+.admin-editor-box h3 {
+  color: #06b6d4;
+  font-size: 1.1rem;
+}
+
+.admin-tip {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 6px 0 12px;
+}
+
+.admin-editor-box label {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 0.85rem;
+}
+
+.admin-editor-box textarea {
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px;
+  background: rgba(30, 41, 59, 0.9);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+}
+
+.save-btn {
+  background: var(--primary-gradient);
+  color: white;
+  border: none;
+  padding: 12px;
+  font-weight: 700;
+  border-radius: 20px;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 10px;
+}
+
+/* 9. 모달 및 기타 */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal-content {
+  background: #1e293b;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 20px;
+  border-radius: var(--radius-md);
+  width: 100%;
+  max-width: 320px;
+  text-align: center;
+  color: #fff;
+}
+
+.modal-content input {
+  width: 100%;
+  padding: 10px;
+  margin: 12px 0;
+  background: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border-radius: var(--radius-sm);
+  font-size: 1rem;
+}
+
+.modal-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.modal-buttons button {
+  flex: 1;
+  padding: 8px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-confirm { background: #06b6d4; color: #fff; }
+.btn-cancel { background: #475569; color: #fff; }
+
+.academy-footer {
+  text-align: center;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+/* PC 대응반응형 (640px 이상) */
+@media (min-width: 640px) {
+  #root {
+    padding: 2rem 1.5rem;
   }
 
-  &::before {
-    left: 0;
-    border-left-color: var(--border);
+  .header-banner {
+    height: 260px;
   }
-  &::after {
-    right: 0;
-    border-right-color: var(--border);
+
+  .banner-overlay h1 {
+    font-size: 2.2rem;
+  }
+
+  .academy-nav {
+    justify-content: center;
+    gap: 0.75rem;
+  }
+
+  .tab-content {
+    padding: 2rem;
+  }
+
+  .course-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .schedule-block-container {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+
+  .link-btn {
+    display: inline-block;
+    width: auto;
+    margin: 0 6px;
+    min-width: 220px;
   }
 }
