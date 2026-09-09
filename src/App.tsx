@@ -240,10 +240,10 @@ function App() {
         {/* 1. 학원소개 */}
         {activeTab === 'about' && (
           <section className="tab-content">
-            <h2>🎧 Vibe Music과 함께하는 음악 퍼포먼스</h2>
+            <h2>🎧 아인클랑과 함께하는 음악 퍼포먼스</h2>
             <div className="video-container">
               <iframe
-                src="https://www.youtube.com/embed/5qap5aO4i9A"
+                src="https://youtu.be/QzKwMGicdwU?si=P5d5BSOxxMyuW0m9"
                 title="Acoustic Guitar Performance"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
