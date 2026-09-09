@@ -519,7 +519,7 @@ body {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background: rgba(239, 68, 68, 0.9);
+  background: rgba(239, 68, 68, 0.4);
   color: white;
   border: none;
   padding: 10px 20px;
@@ -937,4 +937,174 @@ body {
 
 .comment-del-btn:hover {
   background: rgba(239, 68, 68, 0.2);
+}
+
+/* ========================================================
+   댓글 영역 - 모바일 반응형 및 가로 비율 최적화
+======================================================== */
+
+.comments-section {
+  margin-top: 15px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.comments-section h4 {
+  font-size: 0.9rem;
+  color: #94a3b8;
+  margin-bottom: 10px;
+}
+
+/* 댓글 입력 전체 박스 */
+.comment-form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 작성자 & 댓글암호 윗줄 (가로 1:1 비율 고정) */
+.comment-inputs-top {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.comment-sub-input {
+  flex: 1 1 0%; /* exact 50% : 50% 가로 비율 */
+  min-width: 0; /* flex 자식이 가로 폭 넘치는 것 방지 */
+  padding: 8px 12px;
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 0.85rem;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.comment-sub-input:focus {
+  border-color: #38bdf8;
+}
+
+/* 댓글 내용 & 등록버튼 아랫줄 */
+.comment-inputs-bottom {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.comment-text-input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 0.85rem;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.comment-text-input:focus {
+  border-color: #38bdf8;
+}
+
+.add-comment-btn {
+  padding: 8px 16px;
+  background: #0284c7;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.add-comment-btn:hover {
+  background: #0369a1;
+}
+
+/* 댓글 목록 영역 */
+.comments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 개별 댓글 항목 (모바일 넘침 완벽 차단) */
+.comment-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 10px 12px;
+  background: rgba(30, 41, 59, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  width: 100%;
+  box-sizing: border-box;
+  gap: 8px;
+}
+
+.comment-main-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0; /* 긴 텍스트도 자동으로 자르거나 세로로 넘어가게 함 */
+  overflow-wrap: break-word;
+  word-break: break-all;
+}
+
+.comment-header-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.comment-author {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #38bdf8;
+}
+
+.comment-date {
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
+.comment-text {
+  font-size: 0.85rem;
+  color: #e2e8f0;
+  line-height: 1.4;
+}
+
+/* 댓글 삭제 (✕) 버튼 */
+.comment-del-btn {
+  background: rgba(239, 68, 68, 0.1);
+  border: none;
+  color: #f87171;
+  font-size: 0.85rem;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  flex-shrink: 0; /* 모바일에서 크기가 줄어들거나 튀어나오지 않게 고정 */
+  transition: background 0.2s;
+}
+
+.comment-del-btn:hover {
+  background: rgba(239, 68, 68, 0.3);
 }

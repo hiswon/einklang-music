@@ -409,7 +409,7 @@ function App() {
                         className="yt-thumbnail"
                       />
                       <button className="play-overlay-btn" type="button">
-                        ▶ 영상 재생하기
+                        ▶ 재생하기
                       </button>
                     </div>
                   )}
@@ -698,8 +698,7 @@ function App() {
         {activeTab === 'board' && (
           <section className="tab-content text-left">
             <div className="board-top-header">
-              <h2>📋 게시판</h2>
-              {/* 토글 형태의 '새 게시글 작성' 버튼 */}
+              <h2>📋 음악학원 자유 게시판</h2>
               <button
                 className="toggle-write-btn"
                 onClick={() => setShowWriteForm(!showWriteForm)}
@@ -787,7 +786,7 @@ function App() {
                       <div className="comments-section">
                         <h4>💬 댓글 ({post.comments?.length || 0})</h4>
                         
-                        {/* 댓글 입력 폼 (작성자, 암호, 댓글 내용) */}
+                        {/* 댓글 입력 폼 */}
                         <div className="comment-form-grid">
                           <div className="comment-inputs-top">
                             <input
@@ -824,15 +823,17 @@ function App() {
                           </div>
                         </div>
 
-                        {/* 댓글 목록 및 삭제버튼 */}
+                        {/* 댓글 목록 */}
                         {post.comments && post.comments.length > 0 && (
                           <div className="comments-list">
                             {post.comments.map(c => (
                               <div key={c.id} className="comment-item">
                                 <div className="comment-main-info">
-                                  <span className="comment-author">{c.author}</span>
-                                  <span className="comment-text">{c.text}</span>
-                                  <span className="comment-date">{c.createdAt}</span>
+                                  <div className="comment-header-row">
+                                    <span className="comment-author">{c.author}</span>
+                                    <span className="comment-date">{c.createdAt}</span>
+                                  </div>
+                                  <div className="comment-text">{c.text}</div>
                                 </div>
                                 <button
                                   type="button"
