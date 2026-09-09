@@ -321,7 +321,7 @@ function App() {
     )
   }
 
-  // 본문 텍스트 내 링크(유튜브, 이미지, 일반 URL) 파싱 렌더러
+  // 본문 텍스트 내 링크(유튜브, 이미지) 파싱 및 유튜브 URL 제거 렌더러
   const renderPostContent = (postId: string, content: string) => {
     const tokens = content.split(/\s+/)
     const youtubeUrls: string[] = []
@@ -335,11 +335,15 @@ function App() {
       }
     })
 
+    // 💡 유튜브 URL 패턴을 찾아 본문 텍스트에서 깔끔하게 제거
+    const youtubeRegex = /(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/[^\s]+/g
+    const cleanContent = content.replace(youtubeRegex, '').trim()
+
     const isPlaying = playingPostId === postId
 
     return (
       <div className="post-parsed-content">
-        {/* 유튜브 영상 영역 (이중 플레이 방지 적용) */}
+        {/* 1. 유튜브 영상 영역 */}
         {youtubeUrls.length > 0 && (
           <div className="post-media-box">
             {youtubeUrls.map((url, idx) => {
@@ -375,7 +379,7 @@ function App() {
           </div>
         )}
 
-        {/* 이미지 영역 */}
+        {/* 2. 이미지 영역 */}
         {imageUrls.length > 0 && (
           <div className="post-images-grid">
             {imageUrls.map((url, idx) => (
@@ -384,8 +388,8 @@ function App() {
           </div>
         )}
 
-        {/* 글 본문 텍스트 */}
-        <p className="post-text-body">{content}</p>
+        {/* 3. 유튜브 URL이 지워진 순수 글 본문만 출력 */}
+        {cleanContent && <p className="post-text-body">{cleanContent}</p>}
       </div>
     )
   }
