@@ -280,6 +280,12 @@ function App() {
               >
                 🎸 무료 체험 레슨 신청
               </a>
+              <a 
+                href="https://www.instagram.com/einklang.music/" 
+                className="link-btn secondary-link"
+              >
+                🎸 인스타그램
+              </a>
             </div>
           </section>
         )}
@@ -342,7 +348,7 @@ function App() {
       </main>
 
       <footer className="academy-footer">
-        <p>© 2026 Vibe Music Academy. All rights reserved.</p>
+        <p>© 2026 Einklang Music Academy. All rights reserved.</p>
       </footer>
     </div>
   )
