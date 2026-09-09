@@ -16,7 +16,24 @@ interface AcademyData {
   instructors: string
 }
 
-type TabType = 'about' | 'courses' | 'schedule' | 'instructors'
+interface Comment {
+  id: string
+  author: string
+  text: string
+  createdAt: string
+}
+
+interface Post {
+  id: string
+  title: string
+  password: string
+  content: string
+  createdAt: string
+  likes: number
+  comments: Comment[]
+}
+
+type TabType = 'about' | 'courses' | 'schedule' | 'instructors' | 'board'
 
 const defaultSchedule = `3월 15일/ 버스킹 정기 라이브
 신정호 야외무대 오후 5시
@@ -30,6 +47,22 @@ const defaultSchedule = `3월 15일/ 버스킹 정기 라이브
 전문 스튜디오 음원 녹음 체험
 개별 보컬/악기 파일 제공`
 
+// 유틸리티: 유튜브 URL에서 Video ID 추출
+function extractYouTubeId(url: string): string | null {
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/
+  const match = url.match(regExp)
+  return match && match[2].length === 11 ? match[2] : null
+}
+
+// 유틸리티: 이미지 URL 판단
+function isImageUrl(url: string): boolean {
+  return (
+    /\.(jpeg|jpg|gif|png|webp)$/i.test(url) ||
+    url.includes('images.unsplash.com') ||
+    url.includes('imgur.com')
+  )
+}
+
 function App() {
   const [activeTab, setActiveTab] = useState<TabType>('about')
 
@@ -40,6 +73,27 @@ function App() {
     events: '',
     instructors: ''
   })
+
+  // 게시글 관리
+  const [posts, setPosts] = useState<Post[]>([])
+
+  // 게시글 작성 폼
+  const [newTitle, setNewTitle] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [newContent, setNewContent] = useState('')
+
+  // 이중 플레이 방지: 현재 재생 중인 게시물 ID
+  const [playingPostId, setPlayingPostId] = useState<string | null>(null)
+
+  // 좋아요 클릭 상태 저장 (로컬 보관용)
+  const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({})
+
+  // 게시글 삭제 모달
+  const [deleteModalPostId, setDeleteModalPostId] = useState<string | null>(null)
+  const [deletePasswordInput, setDeletePasswordInput] = useState('')
+
+  // 댓글 입력 상태
+  const [commentInputs, setCommentInputs] = useState<Record<string, { author: string; text: string }>>({})
 
   // 관리자 모드
   const [isAdmin, setIsAdmin] = useState<boolean>(false)
@@ -56,7 +110,7 @@ function App() {
         const docRef = doc(db, 'academy', 'data')
         const docSnap = await getDoc(docRef)
         if (docSnap.exists()) {
-          const fetched = docSnap.data() as Partial<AcademyData>
+          const fetched = docSnap.data() as Partial<AcademyData> & { posts?: Post[] }
           const loadedData: AcademyData = {
             schedule: fetched.schedule || defaultSchedule,
             curriculum: fetched.curriculum || '',
@@ -65,6 +119,9 @@ function App() {
           }
           setAcademyData(loadedData)
           setEditForm(loadedData)
+          if (fetched.posts) {
+            setPosts(fetched.posts)
+          }
         }
       } catch (error) {
         console.error('Firebase 데이터 로딩 오류:', error)
@@ -85,16 +142,143 @@ function App() {
     }
   }
 
-  // Firebase 데이터 저장
-  const handleSaveData = async () => {
+  // Firebase 데이터 저장 (학원 정보 + 게시판 목록)
+  const saveAllToFirebase = async (updatedAcademyData: AcademyData, updatedPosts: Post[]) => {
     try {
-      await setDoc(doc(db, 'academy', 'data'), editForm)
-      setAcademyData(editForm)
-      alert('성공적으로 저장되었습니다!')
+      await setDoc(doc(db, 'academy', 'data'), {
+        ...updatedAcademyData,
+        posts: updatedPosts
+      })
     } catch (error) {
-      console.error('저장 실패:', error)
-      alert('저장 중 오류가 발생했습니다.')
+      console.error('Firebase 저장 실패:', error)
     }
+  }
+
+  const handleSaveData = async () => {
+    await saveAllToFirebase(editForm, posts)
+    setAcademyData(editForm)
+    alert('성공적으로 저장되었습니다!')
+  }
+
+  // 게시글 작성 등록
+  const handleCreatePost = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newTitle.trim() || !newPassword.trim() || !newContent.trim()) {
+      alert('제목, 암호, 내용을 모두 입력해 주세요.')
+      return
+    }
+
+    const newPost: Post = {
+      id: Date.now().toString(),
+      title: newTitle.trim(),
+      password: newPassword.trim(),
+      content: newContent.trim(),
+      createdAt: new Date().toLocaleDateString('ko-KR', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      }),
+      likes: 0,
+      comments: []
+    }
+
+    const updatedPosts = [newPost, ...posts]
+    setPosts(updatedPosts)
+    setNewTitle('')
+    setNewPassword('')
+    setNewContent('')
+
+    await saveAllToFirebase(academyData, updatedPosts)
+    alert('게시글이 성공적으로 등록되었습니다.')
+  }
+
+  // 게시글 삭제 처리
+  const handleDeletePost = async () => {
+    if (!deleteModalPostId) return
+
+    const targetPost = posts.find(p => p.id === deleteModalPostId)
+    if (!targetPost) return
+
+    // 작성자 암호 or 관리자 암호('1234')
+    if (deletePasswordInput === targetPost.password || deletePasswordInput === '1234' || isAdmin) {
+      const updatedPosts = posts.filter(p => p.id !== deleteModalPostId)
+      setPosts(updatedPosts)
+      setDeleteModalPostId(null)
+      setDeletePasswordInput('')
+      await saveAllToFirebase(academyData, updatedPosts)
+      alert('게시글이 삭제되었습니다.')
+    } else {
+      alert('암호가 올바르지 않습니다.')
+    }
+  }
+
+  // 좋아요 토글
+  const handleToggleLike = async (postId: string) => {
+    const isLiked = !!likedPosts[postId]
+    const updatedPosts = posts.map(p => {
+      if (p.id === postId) {
+        return {
+          ...p,
+          likes: isLiked ? Math.max(0, p.likes - 1) : p.likes + 1
+        }
+      }
+      return p
+    })
+
+    setPosts(updatedPosts)
+    setLikedPosts(prev => ({ ...prev, [postId]: !isLiked }))
+    await saveAllToFirebase(academyData, updatedPosts)
+  }
+
+  // 댓글 입력 상태 업데이트
+  const handleCommentInputChange = (postId: string, field: 'author' | 'text', value: string) => {
+    setCommentInputs(prev => ({
+      ...prev,
+      [postId]: {
+        ...(prev[postId] || { author: '', text: '' }),
+        [field]: value
+      }
+    }))
+  }
+
+  // 댓글 등록
+  const handleAddComment = async (postId: string) => {
+    const input = commentInputs[postId]
+    if (!input || !input.author.trim() || !input.text.trim()) {
+      alert('작성자와 댓글 내용을 입력하세요.')
+      return
+    }
+
+    const newComment: Comment = {
+      id: Date.now().toString(),
+      author: input.author.trim(),
+      text: input.text.trim(),
+      createdAt: new Date().toLocaleDateString('ko-KR', {
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    }
+
+    const updatedPosts = posts.map(p => {
+      if (p.id === postId) {
+        return {
+          ...p,
+          comments: [...p.comments, newComment]
+        }
+      }
+      return p
+    })
+
+    setPosts(updatedPosts)
+    setCommentInputs(prev => ({
+      ...prev,
+      [postId]: { author: '', text: '' }
+    }))
+    await saveAllToFirebase(academyData, updatedPosts)
   }
 
   // 데이터 파싱 함수 (제목/ 및 세미콜론; 파싱)
@@ -137,6 +321,75 @@ function App() {
     )
   }
 
+  // 본문 텍스트 내 링크(유튜브, 이미지, 일반 URL) 파싱 렌더러
+  const renderPostContent = (postId: string, content: string) => {
+    const tokens = content.split(/\s+/)
+    const youtubeUrls: string[] = []
+    const imageUrls: string[] = []
+
+    tokens.forEach(token => {
+      if (extractYouTubeId(token)) {
+        youtubeUrls.push(token)
+      } else if (isImageUrl(token)) {
+        imageUrls.push(token)
+      }
+    })
+
+    const isPlaying = playingPostId === postId
+
+    return (
+      <div className="post-parsed-content">
+        {/* 유튜브 영상 영역 (이중 플레이 방지 적용) */}
+        {youtubeUrls.length > 0 && (
+          <div className="post-media-box">
+            {youtubeUrls.map((url, idx) => {
+              const videoId = extractYouTubeId(url)
+              if (!videoId) return null
+
+              return (
+                <div key={idx} className="youtube-player-wrapper">
+                  {isPlaying ? (
+                    <div className="video-container">
+                      <iframe
+                        src={`https://www.youtube.com/embed/${videoId}?autoplay=1`}
+                        title={`YouTube Video ${idx}`}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      ></iframe>
+                    </div>
+                  ) : (
+                    <div className="youtube-thumbnail-container" onClick={() => setPlayingPostId(postId)}>
+                      <img
+                        src={`https://img.youtube.com/vi/${videoId}/hqdefault.jpg`}
+                        alt="유튜브 썸네일"
+                        className="yt-thumbnail"
+                      />
+                      <button className="play-overlay-btn" type="button">
+                        ▶ 영상 재생하기
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* 이미지 영역 */}
+        {imageUrls.length > 0 && (
+          <div className="post-images-grid">
+            {imageUrls.map((url, idx) => (
+              <img key={idx} src={url} alt={`업로드 이미지 ${idx}`} className="post-embed-img" />
+            ))}
+          </div>
+        )}
+
+        {/* 글 본문 텍스트 */}
+        <p className="post-text-body">{content}</p>
+      </div>
+    )
+  }
+
   return (
     <div className="academy-container">
       {/* 헤더 */}
@@ -162,7 +415,7 @@ function App() {
         </div>
       </header>
 
-      {/* 비밀번호 모달 */}
+      {/* 관리자 비밀번호 모달 */}
       {showPasswordModal && (
         <div className="modal-overlay">
           <div className="modal-content">
@@ -182,6 +435,30 @@ function App() {
         </div>
       )}
 
+      {/* 게시글 삭제 모달 */}
+      {deleteModalPostId && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3>게시글 삭제</h3>
+            <p className="modal-desc">작성 시 설정한 암호 또는 관리자 암호를 입력하세요.</p>
+            <input
+              type="password"
+              placeholder="암호 입력"
+              value={deletePasswordInput}
+              onChange={(e) => setDeletePasswordInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleDeletePost()}
+            />
+            <div className="modal-buttons">
+              <button className="btn-danger" onClick={handleDeletePost}>삭제하기</button>
+              <button className="btn-cancel" onClick={() => {
+                setDeleteModalPostId(null)
+                setDeletePasswordInput('')
+              }}>취소</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 네비게이션 탭 */}
       <nav className="academy-nav">
         <button className={activeTab === 'about' ? 'active' : ''} onClick={() => setActiveTab('about')}>
@@ -195,6 +472,9 @@ function App() {
         </button>
         <button className={activeTab === 'instructors' ? 'active' : ''} onClick={() => setActiveTab('instructors')}>
           강사진
+        </button>
+        <button className={activeTab === 'board' ? 'active' : ''} onClick={() => setActiveTab('board')}>
+          게시판
         </button>
       </nav>
 
@@ -343,6 +623,138 @@ function App() {
               ;
               보컬 트레이닝/ 보컬 수석 강사\n음원 발매 및 대중음악 트레이너 경험\n녹음식 레코딩 수업 병행`
             )}
+          </section>
+        )}
+
+        {/* 5. 게시판 */}
+        {activeTab === 'board' && (
+          <section className="tab-content text-left">
+            <h2>📋 음악학원 자유 게시판</h2>
+            <p className="desc-text mb-12">
+              유튜브 주소나 이미지 링크를 넣으시면 본문에 영상과 사진이 함께 표시됩니다.
+            </p>
+
+            {/* 글 작성 폼 */}
+            <form className="post-create-form" onSubmit={handleCreatePost}>
+              <h3>✍️ 새 게시글 작성</h3>
+              <div className="form-row">
+                <input
+                  type="text"
+                  placeholder="제목"
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  className="input-field"
+                  required
+                />
+                <input
+                  type="password"
+                  placeholder="암호"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="input-field pass-field"
+                  required
+                />
+              </div>
+              <textarea
+                rows={4}
+                placeholder="내용을 입력하세요. (유튜브 주소나 사진 URL을 포함할 수 있습니다)"
+                value={newContent}
+                onChange={(e) => setNewContent(e.target.value)}
+                className="input-field text-area"
+                required
+              />
+              <button type="submit" className="submit-post-btn">
+                📌 게시글 등록하기
+              </button>
+            </form>
+
+            {/* 게시글 목록 */}
+            <div className="posts-list">
+              {posts.length === 0 ? (
+                <div className="empty-posts">
+                  등록된 게시물이 없습니다.첫 번째 글을 작성해 보세요!
+                </div>
+              ) : (
+                posts.map(post => {
+                  const isLiked = !!likedPosts[post.id]
+                  const currInput = commentInputs[post.id] || { author: '', text: '' }
+
+                  return (
+                    <article key={post.id} className="post-card">
+                      <div className="post-header">
+                        <div className="post-header-main">
+                          <h3 className="post-title">{post.title}</h3>
+                          <span className="post-date">{post.createdAt}</span>
+                        </div>
+                        <button
+                          className="delete-btn"
+                          onClick={() => setDeleteModalPostId(post.id)}
+                        >
+                          🗑️ 삭제
+                        </button>
+                      </div>
+
+                      {/* 유튜브/사진/텍스트 파싱 본문 */}
+                      {renderPostContent(post.id, post.content)}
+
+                      {/* 좋아요 및 하단 반응 바 */}
+                      <div className="post-action-bar">
+                        <button
+                          className={`like-btn ${isLiked ? 'liked' : ''}`}
+                          onClick={() => handleToggleLike(post.id)}
+                        >
+                          {isLiked ? '❤️' : '🤍'} 좋아요 {post.likes}
+                        </button>
+                      </div>
+
+                      {/* 댓글 창 */}
+                      <div className="comments-section">
+                        <h4>💬 댓글 ({post.comments?.length || 0})</h4>
+                        
+                        {/* 댓글 입력 폼 */}
+                        <div className="comment-form">
+                          <input
+                            type="text"
+                            placeholder="작성자"
+                            value={currInput.author}
+                            onChange={(e) => handleCommentInputChange(post.id, 'author', e.target.value)}
+                            className="comment-author-input"
+                          />
+                          <input
+                            type="text"
+                            placeholder="댓글 내용..."
+                            value={currInput.text}
+                            onChange={(e) => handleCommentInputChange(post.id, 'text', e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAddComment(post.id)}
+                            className="comment-text-input"
+                          />
+                          <button
+                            type="button"
+                            className="add-comment-btn"
+                            onClick={() => handleAddComment(post.id)}
+                          >
+                            등록
+                          </button>
+                        </div>
+
+                        {/* 댓글 목록 */}
+                        {post.comments && post.comments.length > 0 && (
+                          <div className="comments-list">
+                            {post.comments.map(c => (
+                              <div key={c.id} className="comment-item">
+                                <span className="comment-author">{c.author}</span>
+                                <span className="comment-text">{c.text}</span>
+                                <span className="comment-date">{c.createdAt}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </article>
+                  )
+                })
+              )}
+            </div>
           </section>
         )}
       </main>
