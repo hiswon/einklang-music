@@ -822,3 +822,119 @@ body {
     min-width: 220px;
   }
 }
+
+/* 게시판 상단 헤더 & 접기/펼치기 버튼 */
+.board-top-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+}
+
+.toggle-write-btn {
+  background: var(--primary-gradient);
+  color: #ffffff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);
+  transition: transform 0.2s, opacity 0.2s;
+}
+
+.toggle-write-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+/* 댓글 작성창 레이아웃 */
+.comment-form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.comment-inputs-top {
+  display: flex;
+  gap: 6px;
+}
+
+.comment-sub-input {
+  flex: 1;
+  padding: 6px 10px;
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 0.8rem;
+  outline: none;
+}
+
+.comment-inputs-bottom {
+  display: flex;
+  gap: 6px;
+}
+
+.comment-text-input {
+  flex: 1;
+  padding: 6px 10px;
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 0.8rem;
+  outline: none;
+}
+
+.comment-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+  padding: 6px 10px;
+  background: rgba(30, 41, 59, 0.4);
+  border-radius: 6px;
+}
+
+.comment-main-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  overflow: hidden;
+}
+
+.comment-author {
+  font-weight: 700;
+  color: #38bdf8;
+  white-space: nowrap;
+}
+
+.comment-text {
+  color: #e2e8f0;
+  word-break: break-word;
+}
+
+.comment-date {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.comment-del-btn {
+  background: transparent;
+  border: none;
+  color: #f87171;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 2px 6px;
+  margin-left: 6px;
+  border-radius: 4px;
+}
+
+.comment-del-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+}

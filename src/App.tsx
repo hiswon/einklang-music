@@ -19,6 +19,7 @@ interface AcademyData {
 interface Comment {
   id: string
   author: string
+  password: string
   text: string
   createdAt: string
 }
@@ -77,7 +78,10 @@ function App() {
   // 게시글 관리
   const [posts, setPosts] = useState<Post[]>([])
 
-  // 게시글 작성 폼
+  // 글 작성 폼 열림/닫힘 상태
+  const [showWriteForm, setShowWriteForm] = useState<boolean>(false)
+
+  // 게시글 작성 폼 입력값
   const [newTitle, setNewTitle] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [newContent, setNewContent] = useState('')
@@ -92,8 +96,12 @@ function App() {
   const [deleteModalPostId, setDeleteModalPostId] = useState<string | null>(null)
   const [deletePasswordInput, setDeletePasswordInput] = useState('')
 
-  // 댓글 입력 상태
-  const [commentInputs, setCommentInputs] = useState<Record<string, { author: string; text: string }>>({})
+  // 댓글 삭제 모달
+  const [deleteCommentTarget, setDeleteCommentTarget] = useState<{ postId: string; commentId: string } | null>(null)
+  const [deleteCommentPasswordInput, setDeleteCommentPasswordInput] = useState('')
+
+  // 댓글 입력 상태 (작성자, 암호, 내용)
+  const [commentInputs, setCommentInputs] = useState<Record<string, { author: string; password: string; text: string }>>({})
 
   // 관리자 모드
   const [isAdmin, setIsAdmin] = useState<boolean>(false)
@@ -189,6 +197,7 @@ function App() {
     setNewTitle('')
     setNewPassword('')
     setNewContent('')
+    setShowWriteForm(false) // 작성 완료 후 폼 닫기
 
     await saveAllToFirebase(academyData, updatedPosts)
     alert('게시글이 성공적으로 등록되었습니다.')
@@ -201,7 +210,6 @@ function App() {
     const targetPost = posts.find(p => p.id === deleteModalPostId)
     if (!targetPost) return
 
-    // 작성자 암호 or 관리자 암호('1234')
     if (deletePasswordInput === targetPost.password || deletePasswordInput === '1234' || isAdmin) {
       const updatedPosts = posts.filter(p => p.id !== deleteModalPostId)
       setPosts(updatedPosts)
@@ -233,11 +241,11 @@ function App() {
   }
 
   // 댓글 입력 상태 업데이트
-  const handleCommentInputChange = (postId: string, field: 'author' | 'text', value: string) => {
+  const handleCommentInputChange = (postId: string, field: 'author' | 'password' | 'text', value: string) => {
     setCommentInputs(prev => ({
       ...prev,
       [postId]: {
-        ...(prev[postId] || { author: '', text: '' }),
+        ...(prev[postId] || { author: '', password: '', text: '' }),
         [field]: value
       }
     }))
@@ -246,14 +254,15 @@ function App() {
   // 댓글 등록
   const handleAddComment = async (postId: string) => {
     const input = commentInputs[postId]
-    if (!input || !input.author.trim() || !input.text.trim()) {
-      alert('작성자와 댓글 내용을 입력하세요.')
+    if (!input || !input.author.trim() || !input.password.trim() || !input.text.trim()) {
+      alert('작성자, 암호, 댓글 내용을 모두 입력하세요.')
       return
     }
 
     const newComment: Comment = {
       id: Date.now().toString(),
       author: input.author.trim(),
+      password: input.password.trim(),
       text: input.text.trim(),
       createdAt: new Date().toLocaleDateString('ko-KR', {
         month: '2-digit',
@@ -267,7 +276,7 @@ function App() {
       if (p.id === postId) {
         return {
           ...p,
-          comments: [...p.comments, newComment]
+          comments: [...(p.comments || []), newComment]
         }
       }
       return p
@@ -276,9 +285,40 @@ function App() {
     setPosts(updatedPosts)
     setCommentInputs(prev => ({
       ...prev,
-      [postId]: { author: '', text: '' }
+      [postId]: { author: '', password: '', text: '' }
     }))
     await saveAllToFirebase(academyData, updatedPosts)
+  }
+
+  // 댓글 삭제 처리
+  const handleDeleteComment = async () => {
+    if (!deleteCommentTarget) return
+    const { postId, commentId } = deleteCommentTarget
+
+    const targetPost = posts.find(p => p.id === postId)
+    const targetComment = targetPost?.comments?.find(c => c.id === commentId)
+
+    if (!targetComment) return
+
+    if (deleteCommentPasswordInput === targetComment.password || deleteCommentPasswordInput === '1234' || isAdmin) {
+      const updatedPosts = posts.map(p => {
+        if (p.id === postId) {
+          return {
+            ...p,
+            comments: p.comments.filter(c => c.id !== commentId)
+          }
+        }
+        return p
+      })
+
+      setPosts(updatedPosts)
+      setDeleteCommentTarget(null)
+      setDeleteCommentPasswordInput('')
+      await saveAllToFirebase(academyData, updatedPosts)
+      alert('댓글이 삭제되었습니다.')
+    } else {
+      alert('댓글 암호가 올바르지 않습니다.')
+    }
   }
 
   // 데이터 파싱 함수 (제목/ 및 세미콜론; 파싱)
@@ -321,7 +361,7 @@ function App() {
     )
   }
 
-  // 본문 텍스트 내 링크(유튜브, 이미지) 파싱 및 유튜브 URL 제거 렌더러
+  // 본문 텍스트 내 링크(유튜브, 이미지) 파싱 및 유튜브 URL 지우기
   const renderPostContent = (postId: string, content: string) => {
     const tokens = content.split(/\s+/)
     const youtubeUrls: string[] = []
@@ -335,7 +375,7 @@ function App() {
       }
     })
 
-    // 💡 유튜브 URL 패턴을 찾아 본문 텍스트에서 깔끔하게 제거
+    // 유튜브 URL 제거
     const youtubeRegex = /(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/[^\s]+/g
     const cleanContent = content.replace(youtubeRegex, '').trim()
 
@@ -343,7 +383,7 @@ function App() {
 
     return (
       <div className="post-parsed-content">
-        {/* 1. 유튜브 영상 영역 */}
+        {/* 유튜브 영상 영역 */}
         {youtubeUrls.length > 0 && (
           <div className="post-media-box">
             {youtubeUrls.map((url, idx) => {
@@ -379,7 +419,7 @@ function App() {
           </div>
         )}
 
-        {/* 2. 이미지 영역 */}
+        {/* 이미지 영역 */}
         {imageUrls.length > 0 && (
           <div className="post-images-grid">
             {imageUrls.map((url, idx) => (
@@ -388,7 +428,7 @@ function App() {
           </div>
         )}
 
-        {/* 3. 유튜브 URL이 지워진 순수 글 본문만 출력 */}
+        {/* 정제된 글 본문만 출력 */}
         {cleanContent && <p className="post-text-body">{cleanContent}</p>}
       </div>
     )
@@ -457,6 +497,30 @@ function App() {
               <button className="btn-cancel" onClick={() => {
                 setDeleteModalPostId(null)
                 setDeletePasswordInput('')
+              }}>취소</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 댓글 삭제 모달 */}
+      {deleteCommentTarget && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3>댓글 삭제</h3>
+            <p className="modal-desc">댓글 작성 시 입력한 암호 또는 관리자 암호를 입력하세요.</p>
+            <input
+              type="password"
+              placeholder="댓글 암호 입력"
+              value={deleteCommentPasswordInput}
+              onChange={(e) => setDeleteCommentPasswordInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleDeleteComment()}
+            />
+            <div className="modal-buttons">
+              <button className="btn-danger" onClick={handleDeleteComment}>삭제하기</button>
+              <button className="btn-cancel" onClick={() => {
+                setDeleteCommentTarget(null)
+                setDeleteCommentPasswordInput('')
               }}>취소</button>
             </div>
           </div>
@@ -633,55 +697,63 @@ function App() {
         {/* 5. 게시판 */}
         {activeTab === 'board' && (
           <section className="tab-content text-left">
-            <h2>📋 음악학원 자유 게시판</h2>
-            <p className="desc-text mb-12">
-              유튜브 주소나 이미지 링크를 넣으시면 본문에 영상과 사진이 함께 표시됩니다.
-            </p>
-
-            {/* 글 작성 폼 */}
-            <form className="post-create-form" onSubmit={handleCreatePost}>
-              <h3>✍️ 새 게시글 작성</h3>
-              <div className="form-row">
-                <input
-                  type="text"
-                  placeholder="제목"
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  className="input-field"
-                  required
-                />
-                <input
-                  type="password"
-                  placeholder="암호"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="input-field pass-field"
-                  required
-                />
-              </div>
-              <textarea
-                rows={4}
-                placeholder="내용을 입력하세요. (유튜브 주소나 사진 URL을 포함할 수 있습니다)"
-                value={newContent}
-                onChange={(e) => setNewContent(e.target.value)}
-                className="input-field text-area"
-                required
-              />
-              <button type="submit" className="submit-post-btn">
-                📌 게시글 등록하기
+            <div className="board-top-header">
+              <h2>📋 게시판</h2>
+              {/* 토글 형태의 '새 게시글 작성' 버튼 */}
+              <button
+                className="toggle-write-btn"
+                onClick={() => setShowWriteForm(!showWriteForm)}
+              >
+                {showWriteForm ? '❌ 작성 창 닫기' : '✍️ 새 게시글 작성'}
               </button>
-            </form>
+            </div>
+
+            {/* 평소에는 닫혀 있다가 버튼 클릭 시 펼쳐지는 작성 폼 */}
+            {showWriteForm && (
+              <form className="post-create-form" onSubmit={handleCreatePost}>
+                <h3>✍️ 새 게시글 작성하기</h3>
+                <div className="form-row">
+                  <input
+                    type="text"
+                    placeholder="제목"
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    className="input-field"
+                    required
+                  />
+                  <input
+                    type="password"
+                    placeholder="암호"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="input-field pass-field"
+                    required
+                  />
+                </div>
+                <textarea
+                  rows={4}
+                  placeholder="내용을 입력하세요. (유튜브 주소나 사진 URL을 포함할 수 있습니다)"
+                  value={newContent}
+                  onChange={(e) => setNewContent(e.target.value)}
+                  className="input-field text-area"
+                  required
+                />
+                <button type="submit" className="submit-post-btn">
+                  📌 게시글 등록하기
+                </button>
+              </form>
+            )}
 
             {/* 게시글 목록 */}
             <div className="posts-list">
               {posts.length === 0 ? (
                 <div className="empty-posts">
-                  등록된 게시물이 없습니다.첫 번째 글을 작성해 보세요!
+                  등록된 게시물이 없습니다. 상단의 버튼을 눌러 첫 번째 글을 작성해 보세요!
                 </div>
               ) : (
                 posts.map(post => {
                   const isLiked = !!likedPosts[post.id]
-                  const currInput = commentInputs[post.id] || { author: '', text: '' }
+                  const currInput = commentInputs[post.id] || { author: '', password: '', text: '' }
 
                   return (
                     <article key={post.id} className="post-card">
@@ -701,7 +773,7 @@ function App() {
                       {/* 유튜브/사진/텍스트 파싱 본문 */}
                       {renderPostContent(post.id, post.content)}
 
-                      {/* 좋아요 및 하단 반응 바 */}
+                      {/* 좋아요 및 반응 바 */}
                       <div className="post-action-bar">
                         <button
                           className={`like-btn ${isLiked ? 'liked' : ''}`}
@@ -715,40 +787,60 @@ function App() {
                       <div className="comments-section">
                         <h4>💬 댓글 ({post.comments?.length || 0})</h4>
                         
-                        {/* 댓글 입력 폼 */}
-                        <div className="comment-form">
-                          <input
-                            type="text"
-                            placeholder="작성자"
-                            value={currInput.author}
-                            onChange={(e) => handleCommentInputChange(post.id, 'author', e.target.value)}
-                            className="comment-author-input"
-                          />
-                          <input
-                            type="text"
-                            placeholder="댓글 내용..."
-                            value={currInput.text}
-                            onChange={(e) => handleCommentInputChange(post.id, 'text', e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleAddComment(post.id)}
-                            className="comment-text-input"
-                          />
-                          <button
-                            type="button"
-                            className="add-comment-btn"
-                            onClick={() => handleAddComment(post.id)}
-                          >
-                            등록
-                          </button>
+                        {/* 댓글 입력 폼 (작성자, 암호, 댓글 내용) */}
+                        <div className="comment-form-grid">
+                          <div className="comment-inputs-top">
+                            <input
+                              type="text"
+                              placeholder="작성자"
+                              value={currInput.author}
+                              onChange={(e) => handleCommentInputChange(post.id, 'author', e.target.value)}
+                              className="comment-sub-input"
+                            />
+                            <input
+                              type="password"
+                              placeholder="댓글 암호"
+                              value={currInput.password}
+                              onChange={(e) => handleCommentInputChange(post.id, 'password', e.target.value)}
+                              className="comment-sub-input"
+                            />
+                          </div>
+                          <div className="comment-inputs-bottom">
+                            <input
+                              type="text"
+                              placeholder="댓글 내용..."
+                              value={currInput.text}
+                              onChange={(e) => handleCommentInputChange(post.id, 'text', e.target.value)}
+                              onKeyDown={(e) => e.key === 'Enter' && handleAddComment(post.id)}
+                              className="comment-text-input"
+                            />
+                            <button
+                              type="button"
+                              className="add-comment-btn"
+                              onClick={() => handleAddComment(post.id)}
+                            >
+                              등록
+                            </button>
+                          </div>
                         </div>
 
-                        {/* 댓글 목록 */}
+                        {/* 댓글 목록 및 삭제버튼 */}
                         {post.comments && post.comments.length > 0 && (
                           <div className="comments-list">
                             {post.comments.map(c => (
                               <div key={c.id} className="comment-item">
-                                <span className="comment-author">{c.author}</span>
-                                <span className="comment-text">{c.text}</span>
-                                <span className="comment-date">{c.createdAt}</span>
+                                <div className="comment-main-info">
+                                  <span className="comment-author">{c.author}</span>
+                                  <span className="comment-text">{c.text}</span>
+                                  <span className="comment-date">{c.createdAt}</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  className="comment-del-btn"
+                                  onClick={() => setDeleteCommentTarget({ postId: post.id, commentId: c.id })}
+                                >
+                                  ✕
+                                </button>
                               </div>
                             ))}
                           </div>
