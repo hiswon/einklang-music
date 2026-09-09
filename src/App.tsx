@@ -243,7 +243,7 @@ function App() {
             <h2>🎧 아인클랑과 함께하는 음악 퍼포먼스</h2>
             <div className="video-container">
               <iframe
-                src="https://youtu.be/QzKwMGicdwU?si=P5d5BSOxxMyuW0m9"
+                src="https://youtu.be/QzKwMGicdwU?list=RDQzKwMGicdwU"
                 title="Acoustic Guitar Performance"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
