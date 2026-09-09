@@ -143,8 +143,8 @@ function App() {
       <header className="academy-header">
         <div className="header-banner" style={{ backgroundImage: `url(${HEADER_BG})` }}>
           <div className="banner-overlay">
-            <span className="badge-neon">TRENDY MUSIC STUDIO</span>
-            <h1>VIBE MUSIC ACADEMY</h1>
+            <span className="badge-neon">EINKLANG MUSIC STUDIO</span>
+            <h1>EINKLANG MUSIC ACADEMY</h1>
             <p className="subtitle">나만의 감성을 연주하다 · 보컬 | 통기타 & 핑거스타일 | 미디 & 작곡</p>
           </div>
         </div>
