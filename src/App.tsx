@@ -228,7 +228,7 @@ export default function App() {
       setShowAuthModal(false)
       setLoginId('')
       setLoginPw('')
-      //alert(`${target.name}님 환영합니다!`)
+      alert(`${target.name}님 환영합니다!`)
     } else {
       alert('아이디 또는 비밀번호가 올바르지 않습니다.')
     }
@@ -360,7 +360,7 @@ export default function App() {
         timestamp: now.getTime()
       }
       updatedList.unshift(newRec)
-      alert(`"환영합니다. 사랑합니다."\n[등원 완료] ${student.name} (${timeStr})`)
+      //alert(`"환영합니다. 사랑합니다."\n[등원 완료] ${student.name} (${timeStr})`)
     } else {
       // 2) 두 번째 찍힘: 하원
       const targetRec = updatedList[existingIndex]
@@ -372,7 +372,7 @@ export default function App() {
         ...targetRec,
         checkOut: timeStr
       }
-      alert(`"사랑합니다. 안녕히 가세요."\n[하원 완료] ${student.name} (${timeStr})`)
+      //alert(`"사랑합니다. 안녕히 가세요."\n[하원 완료] ${student.name} (${timeStr})`)
     }
 
     setAttendances(updatedList)
