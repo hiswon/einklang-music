@@ -228,7 +228,7 @@ export default function App() {
       setShowAuthModal(false)
       setLoginId('')
       setLoginPw('')
-      alert(`${target.name}님 환영합니다!`)
+      //alert(`${target.name}님 환영합니다!`)
     } else {
       alert('아이디 또는 비밀번호가 올바르지 않습니다.')
     }
