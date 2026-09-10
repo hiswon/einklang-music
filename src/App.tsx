@@ -963,13 +963,13 @@ export default function App() {
         {activeTab === 'board' && (
           <section className="tab-content text-left">
             <div className="board-top-header">
-              <h2>📋 자유 게시판</h2>
+              <h2>📋 게시판</h2>
               {currentUser ? (
                 <button className="toggle-write-btn" onClick={() => setShowWriteForm(!showWriteForm)}>
                   {showWriteForm ? '❌ 작성 창 닫기' : '✍️ 새 글 작성'}
                 </button>
               ) : (
-                <span className="info-badge">로그인 후 글 작성이 가능합니다.</span>
+                <span className="info-badge">로그인 후 글 작성해요.</span>
               )}
             </div>
 
