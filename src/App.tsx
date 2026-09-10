@@ -7,8 +7,18 @@ import { Html5QrcodeScanner } from 'html5-qrcode'
 
 const HEADER_BG = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?q=80&w=1200&auto=format&fit=crop'
 const CLASS_IMG_1 = 'https://images.unsplash.com/photo-1510915361894-db8b60106cb1?q=80&w=800&auto=format&fit=crop'
-//const CLASS_IMG_2 = 'https://images.unsplash.com/photo-1520523839897-bd0b52f945a0?q=80&w=800&auto=format&fit=crop'
 const CLASS_IMG_3 = 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?q=80&w=800&auto=format&fit=crop'
+
+export type UserCategory = 'GENERAL' | 'KIDS' | 'ELEMENTARY' | 'MIDDLE' | 'HIGH' | 'ADULT'
+
+export const CATEGORY_LABELS: Record<UserCategory, string> = {
+  GENERAL: '일반 (글쓰기 전용)',
+  KIDS: '유치부',
+  ELEMENTARY: '초등부',
+  MIDDLE: '중등부',
+  HIGH: '고등부',
+  ADULT: '성인부'
+}
 
 interface AcademyData {
   schedule: string
@@ -22,6 +32,7 @@ interface User {
   password: string
   name: string
   reason: string
+  category: UserCategory
   role: 'ADMIN' | 'USER'
 }
 
@@ -29,6 +40,7 @@ interface AttendanceRecord {
   id: string
   userId: string
   userName: string
+  category: UserCategory
   date: string // YYYY-MM-DD
   checkIn: string // HH:mm:ss
   checkOut?: string // HH:mm:ss
@@ -54,6 +66,7 @@ interface Post {
 }
 
 type TabType = 'about' | 'courses' | 'schedule' | 'instructors' | 'board' | 'attendance' | 'qr'
+type AdminMode = 'OBSERVE' | 'EDIT' | 'QR'
 
 const defaultSchedule = `3월 15일/ 버스킹 정기 라이브
 신정호 야외무대 오후 5시
@@ -67,10 +80,9 @@ const defaultSchedule = `3월 15일/ 버스킹 정기 라이브
 전문 스튜디오 음원 녹음 체험
 개별 보컬/악기 파일 제공`
 
-// 고정 관리자 정보
 const ADMIN_ACCOUNTS: User[] = [
-  { id: 'jin', password: '12345', name: 'jin', reason: '관리자 계정', role: 'ADMIN' },
-  { id: 'rang', password: '67890', name: 'rang', reason: '관리자 계정', role: 'ADMIN' }
+  { id: 'jin', password: '12345', name: '관리자1(jin)', reason: '관리자', category: 'ADULT', role: 'ADMIN' },
+  { id: 'rang', password: '67890', name: '관리자2(rang)', reason: '관리자', category: 'ADULT', role: 'ADMIN' }
 ]
 
 function extractGoogleDriveId(url: string): string | null {
@@ -93,7 +105,6 @@ function isImageUrl(url: string): boolean {
   )
 }
 
-// 주차 계산 유틸리티
 function getWeekNumber(d: Date) {
   const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
   const dayNum = date.getUTCDay() || 7
@@ -104,8 +115,8 @@ function getWeekNumber(d: Date) {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('about')
+  const [adminMode, setAdminMode] = useState<AdminMode>('OBSERVE')
 
-  // 상태 관리
   const [academyData, setAcademyData] = useState<AcademyData>({
     schedule: defaultSchedule,
     curriculum: '',
@@ -116,39 +127,38 @@ export default function App() {
   const [users, setUsers] = useState<User[]>(ADMIN_ACCOUNTS)
   const [attendances, setAttendances] = useState<AttendanceRecord[]>([])
 
-  // 현재 로그인 사용자
   const [currentUser, setCurrentUser] = useState<User | null>(null)
 
-  // 로그인 & 회원가입 모달
+  // 회원가입/로그인 모달
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false)
   const [authMode, setAuthMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN')
   const [loginId, setLoginId] = useState('')
   const [loginPw, setLoginPw] = useState('')
-  
-  // 회원가입 폼
+
   const [regId, setRegId] = useState('')
   const [regPw, setRegPw] = useState('')
   const [regName, setRegName] = useState('')
   const [regReason, setRegReason] = useState('')
+  const [regCategory, setRegCategory] = useState<UserCategory>('GENERAL')
 
-  // 게시글 작성
+  // 게시판
   const [showWriteForm, setShowWriteForm] = useState<boolean>(false)
   const [newTitle, setNewTitle] = useState('')
   const [newContent, setNewContent] = useState('')
-
-  // 플레이어 및 댓글 입력
   const [playingPostId, setPlayingPostId] = useState<string | null>(null)
-  //const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({})
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({})
 
-  // 관리자 수정용 폼
+  // 편집용
   const [editForm, setEditForm] = useState<AcademyData>(academyData)
 
-  // 관리자 출석조회 필터
+  // 관리자 필터 및 암호 입력
   const [filterMode, setFilterMode] = useState<'ALL' | 'DAILY' | 'WEEKLY'>('ALL')
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+  const [showExitPasswordModal, setShowExitPasswordModal] = useState(false)
+  const [exitPasswordInput, setExitPasswordInput] = useState('')
+  const [targetAdminMode, setTargetAdminMode] = useState<AdminMode>('OBSERVE')
 
-  // Firebase 초기 로딩
+  // 데이터 조회
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -166,7 +176,6 @@ export default function App() {
           setEditForm(loadedData)
           if (fetched.posts) setPosts(fetched.posts)
           if (fetched.users) {
-            // 기본 고정 관리자와 DB 사용자 병합
             const mergedUsers = [...ADMIN_ACCOUNTS]
             fetched.users.forEach((u: User) => {
               if (!mergedUsers.find(exist => exist.id === u.id)) {
@@ -184,7 +193,6 @@ export default function App() {
     fetchData()
   }, [])
 
-  // Firebase 동기화
   const saveDataToFirebase = async (
     data = academyData,
     pList = posts,
@@ -195,7 +203,7 @@ export default function App() {
       await setDoc(doc(db, 'academy', 'data'), {
         ...data,
         posts: pList,
-        users: uList.filter(u => u.role !== 'ADMIN'), // 일반 사용자만 DB 저장
+        users: uList.filter(u => u.role !== 'ADMIN'),
         attendances: aList
       })
     } catch (e) {
@@ -203,7 +211,7 @@ export default function App() {
     }
   }
 
-  // 로그인 처리
+  // 로그인
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
     const target = users.find(u => u.id === loginId && u.password === loginPw)
@@ -218,7 +226,7 @@ export default function App() {
     }
   }
 
-  // 회원가입 처리
+  // 회원가입
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!regId || !regPw || !regName || !regReason) {
@@ -235,6 +243,7 @@ export default function App() {
       password: regPw.trim(),
       name: regName.trim(),
       reason: regReason.trim(),
+      category: regCategory,
       role: 'USER'
     }
 
@@ -243,31 +252,49 @@ export default function App() {
     setCurrentUser(newUser)
     setShowAuthModal(false)
 
-    setRegId(''); setRegPw(''); setRegName(''); setRegReason('')
+    setRegId(''); setRegPw(''); setRegName(''); setRegReason(''); setRegCategory('GENERAL')
     await saveDataToFirebase(academyData, posts, updatedUsers, attendances)
     alert('회원가입이 완료되었습니다!')
   }
 
-  // 로그아웃
+  // 로그아웃 & 탈퇴
   const handleLogout = () => {
     setCurrentUser(null)
     setActiveTab('about')
     alert('로그아웃 되었습니다.')
   }
 
-  // QR 출석 처리 함수 (오늘 첫 스캔 -> 등원, 두번째 -> 하원)
+  const handleDeleteAccount = async () => {
+    if (!currentUser) return
+    if (currentUser.role === 'ADMIN') {
+      alert('관리자 계정은 탈퇴할 수 없습니다.')
+      return
+    }
+    if (window.confirm('정말로 탈퇴하시겠습니까? 등록된 회원 정보가 삭제됩니다.')) {
+      const updatedUsers = users.filter(u => u.id !== currentUser.id)
+      setUsers(updatedUsers)
+      setCurrentUser(null)
+      await saveDataToFirebase(academyData, posts, updatedUsers, attendances)
+      alert('회원 탈퇴가 완료되었습니다.')
+    }
+  }
+
+  // QR 출석 처리 (등원 / 하원)
   const processAttendance = async (scannedUserId: string) => {
     const student = users.find(u => u.id === scannedUserId)
     if (!student) {
       alert('존재하지 않는 회원 정보입니다.')
       return
     }
+    if (student.category === 'GENERAL') {
+      alert('일반 회원은 QR 출석 대상이 아닙니다.')
+      return
+    }
 
     const now = new Date()
-    const todayStr = now.toISOString().split('T')[0] // YYYY-MM-DD
-    const timeStr = now.toTimeString().split(' ')[0] // HH:mm:ss
+    const todayStr = now.toISOString().split('T')[0]
+    const timeStr = now.toTimeString().split(' ')[0]
 
-    // 오늘 스캔 기록 조회
     const existingIndex = attendances.findIndex(
       a => a.userId === scannedUserId && a.date === todayStr
     )
@@ -275,38 +302,58 @@ export default function App() {
     let updatedList = [...attendances]
 
     if (existingIndex === -1) {
-      // 1) 오늘 첫 번째 찍힘 -> 등원
       const newRec: AttendanceRecord = {
         id: Date.now().toString(),
         userId: student.id,
         userName: student.name,
+        category: student.category,
         date: todayStr,
         checkIn: timeStr,
         timestamp: now.getTime()
       }
       updatedList.unshift(newRec)
-      alert(`[등원 완료] ${student.name}님 등원 시간: ${timeStr}`)
+      alert(`[등원 완료] ${student.name} (${CATEGORY_LABELS[student.category]}) - 등원: ${timeStr}`)
     } else {
-      // 2) 오늘 두 번째 찍힘 -> 하원
       const targetRec = updatedList[existingIndex]
       if (targetRec.checkOut) {
-        alert(`${student.name}님은 이미 오늘 하원까지 완료 처리되었습니다.`)
+        alert(`${student.name}님은 이미 오늘 하원 처리까지 완료되었습니다.`)
         return
       }
       updatedList[existingIndex] = {
         ...targetRec,
         checkOut: timeStr
       }
-      alert(`[하원 완료] ${student.name}님 하원 시간: ${timeStr}`)
+      alert(`[하원 완료] ${student.name} (${CATEGORY_LABELS[student.category]}) - 하원: ${timeStr}`)
     }
 
     setAttendances(updatedList)
     await saveDataToFirebase(academyData, posts, users, updatedList)
   }
 
-  // 관리자용 QR 스캐너 컴포넌트 내부 효과
+  // 관리자 모드 변경 제어 (QR 모드 탈출 시 암호 검증)
+  const handleAdminModeChange = (mode: AdminMode) => {
+    if (adminMode === 'QR' && mode !== 'QR') {
+      setTargetAdminMode(mode)
+      setShowExitPasswordModal(true)
+    } else {
+      setAdminMode(mode)
+    }
+  }
+
+  const handleVerifyExitPassword = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (exitPasswordInput === '12345') {
+      setAdminMode(targetAdminMode)
+      setShowExitPasswordModal(false)
+      setExitPasswordInput('')
+    } else {
+      alert('암호가 올바르지 않습니다.')
+    }
+  }
+
+  // QR 스캐너 바인딩
   useEffect(() => {
-    if (activeTab === 'qr' && currentUser?.role === 'ADMIN') {
+    if ((activeTab === 'qr' || adminMode === 'QR') && currentUser?.role === 'ADMIN') {
       const scanner = new Html5QrcodeScanner(
         'qr-reader',
         { fps: 10, qrbox: { width: 250, height: 250 } },
@@ -332,9 +379,20 @@ export default function App() {
         scanner.clear().catch(() => {})
       }
     }
-  }, [activeTab, currentUser])
+  }, [activeTab, adminMode, currentUser])
 
-  // 게시글 작성
+  // 게시판 좋아요 및 작성/댓글
+  const handleToggleLike = async (postId: string) => {
+    const updated = posts.map(p => {
+      if (p.id === postId) {
+        return { ...p, likes: (p.likes || 0) + 1 }
+      }
+      return p
+    })
+    setPosts(updated)
+    await saveDataToFirebase(academyData, updated, users, attendances)
+  }
+
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!currentUser) return
@@ -370,7 +428,6 @@ export default function App() {
     alert('게시글이 등록되었습니다.')
   }
 
-  // 게시글 삭제
   const handleDeletePost = async (post: Post) => {
     if (!currentUser) return
     if (currentUser.role === 'ADMIN' || currentUser.id === post.authorId) {
@@ -384,7 +441,6 @@ export default function App() {
     }
   }
 
-  // 댓글 등록 (최신 댓글이 위로 쌓이도록 unshift)
   const handleAddComment = async (postId: string) => {
     if (!currentUser) {
       alert('로그인이 필요합니다.')
@@ -409,7 +465,7 @@ export default function App() {
       if (p.id === postId) {
         return {
           ...p,
-          comments: [newComment, ...(p.comments || [])] // 최신 댓글을 맨 앞에 추가
+          comments: [newComment, ...(p.comments || [])]
         }
       }
       return p
@@ -420,7 +476,6 @@ export default function App() {
     await saveDataToFirebase(academyData, updatedPosts, users, attendances)
   }
 
-  // 댓글 삭제
   const handleDeleteComment = async (postId: string, comment: Comment) => {
     if (!currentUser) return
     if (currentUser.role === 'ADMIN' || currentUser.name === comment.author) {
@@ -435,19 +490,15 @@ export default function App() {
       })
       setPosts(updatedPosts)
       await saveDataToFirebase(academyData, updatedPosts, users, attendances)
-    } else {
-      alert('본인 댓글만 삭제 가능합니다.')
     }
   }
 
-  // 학원 정보 수정 저장
   const handleSaveAcademyData = async () => {
     await saveDataToFirebase(editForm, posts, users, attendances)
     setAcademyData(editForm)
     alert('학원 정보가 수정되었습니다!')
   }
 
-  // 일정을 세미콜론 기준으로 파싱하여 출력
   const renderFormattedContent = (text: string) => {
     if (!text) return <p className="empty-text">등록된 내용이 없습니다.</p>
     const blocks = text.split(';').map(b => b.trim()).filter(Boolean)
@@ -479,7 +530,6 @@ export default function App() {
     )
   }
 
-  // 게시판 미디어 파싱
   const renderPostContent = (postId: string, content: string) => {
     const tokens = content.split(/\s+/)
     const youtubeUrls: string[] = []
@@ -549,7 +599,6 @@ export default function App() {
     )
   }
 
-  // 관리자 모드 출석 필터링
   const getFilteredAttendances = () => {
     if (filterMode === 'DAILY') {
       return attendances.filter(a => a.date === selectedDate)
@@ -566,6 +615,43 @@ export default function App() {
     return attendances
   }
 
+  // 관리자 전용 : 큐알 전용 모드 화면
+  if (currentUser?.role === 'ADMIN' && adminMode === 'QR') {
+    return (
+      <div className="full-qr-mode-screen">
+        <div className="qr-mode-header">
+          <h2>📷 아인클랑 QR 출석 전용 스캐너</h2>
+          <button className="exit-qr-mode-btn" onClick={() => handleAdminModeChange('OBSERVE')}>
+            🔒 스캐너 모드 종료 (암호 필요)
+          </button>
+        </div>
+        <div id="qr-reader" style={{ maxWidth: '500px', width: '100%', margin: '0 auto' }}></div>
+
+        {showExitPasswordModal && (
+          <div className="modal-overlay">
+            <div className="modal-content">
+              <h3>🔒 모드 전환 암호 입력</h3>
+              <p className="desc-text">학생들의 오작동을 방지하기 위해 암호를 입력해야 합니다. (기본: 12345)</p>
+              <form onSubmit={handleVerifyExitPassword}>
+                <input
+                  type="password"
+                  placeholder="관리자 암호"
+                  value={exitPasswordInput}
+                  onChange={e => setExitPasswordInput(e.target.value)}
+                  required
+                />
+                <div className="modal-buttons">
+                  <button type="submit" className="btn-confirm">확인</button>
+                  <button type="button" className="btn-cancel" onClick={() => setShowExitPasswordModal(false)}>취소</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="academy-container">
       {/* 헤더 */}
@@ -578,13 +664,23 @@ export default function App() {
           </div>
         </div>
 
-        {/* 상단 로그인 상태 바 */}
+        {/* 상단 로그인 바 */}
         <div className="admin-bar">
           {currentUser ? (
             <div className="user-info-bar">
               <span>
-                <strong>{currentUser.name}</strong> ({currentUser.role === 'ADMIN' ? '관리자' : '회원'})님
+                <strong>{currentUser.name}</strong> [{CATEGORY_LABELS[currentUser.category]}]
               </span>
+              {currentUser.role === 'ADMIN' && (
+                <div className="admin-mode-selector">
+                  <button className={adminMode === 'OBSERVE' ? 'active' : ''} onClick={() => handleAdminModeChange('OBSERVE')}>👀 관찰모드</button>
+                  <button className={adminMode === 'EDIT' ? 'active' : ''} onClick={() => handleAdminModeChange('EDIT')}>✏️ 수정모드</button>
+                  <button className={adminMode === 'QR' ? 'active' : ''} onClick={() => handleAdminModeChange('QR')}>📷 QR모드</button>
+                </div>
+              )}
+              {currentUser.role === 'USER' && (
+                <button className="admin-btn delete-acc" onClick={handleDeleteAccount}>회원 탈퇴</button>
+              )}
               <button className="admin-btn logout" onClick={handleLogout}>로그아웃</button>
             </div>
           ) : (
@@ -595,7 +691,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* 로그인 / 회원가입 모달 */}
+      {/* 로그인/회원가입 모달 */}
       {showAuthModal && (
         <div className="modal-overlay">
           <div className="modal-content">
@@ -626,6 +722,20 @@ export default function App() {
               </form>
             ) : (
               <form onSubmit={handleRegister}>
+                <label className="input-label">회원 구분 선택:</label>
+                <select
+                  value={regCategory}
+                  onChange={e => setRegCategory(e.target.value as UserCategory)}
+                  className="modal-select"
+                >
+                  <option value="GENERAL">일반 (글쓰기 전용, QR코드 미발급)</option>
+                  <option value="KIDS">유치부</option>
+                  <option value="ELEMENTARY">초등부</option>
+                  <option value="MIDDLE">중등부</option>
+                  <option value="HIGH">고등부</option>
+                  <option value="ADULT">성인부</option>
+                </select>
+
                 <input
                   type="text"
                   placeholder="아이디"
@@ -667,7 +777,7 @@ export default function App() {
         </div>
       )}
 
-      {/* 네비게이션 탭 */}
+      {/* 네비게이션 */}
       <nav className="academy-nav">
         <button className={activeTab === 'about' ? 'active' : ''} onClick={() => setActiveTab('about')}>학원소개</button>
         <button className={activeTab === 'courses' ? 'active' : ''} onClick={() => setActiveTab('courses')}>수강과목</button>
@@ -675,42 +785,36 @@ export default function App() {
         <button className={activeTab === 'instructors' ? 'active' : ''} onClick={() => setActiveTab('instructors')}>강사진</button>
         <button className={activeTab === 'board' ? 'active' : ''} onClick={() => setActiveTab('board')}>게시판</button>
 
-        {/* 회원용 My QR 탭 */}
         {currentUser && currentUser.role === 'USER' && (
-          <button className={activeTab === 'qr' ? 'active' : ''} onClick={() => setActiveTab('qr')}>📱 내 QR코드</button>
+          <button className={activeTab === 'qr' ? 'active' : ''} onClick={() => setActiveTab('qr')}>📱 마이 QR/출석현황</button>
         )}
 
-        {/* 관리자용 출석 관리 & QR 스캐너 탭 */}
         {currentUser && currentUser.role === 'ADMIN' && (
-          <>
-            <button className={activeTab === 'qr' ? 'active' : ''} onClick={() => setActiveTab('qr')}>📷 QR 스캐너</button>
-            <button className={activeTab === 'attendance' ? 'active' : ''} onClick={() => setActiveTab('attendance')}>📊 출석부</button>
-          </>
+          <button className={activeTab === 'attendance' ? 'active' : ''} onClick={() => setActiveTab('attendance')}>📊 원생 출석부</button>
         )}
       </nav>
 
-      {/* 메인 콘텐츠 */}
       <main className="academy-content">
-        {/* 관리자 정보 수정 폼 */}
-        {currentUser?.role === 'ADMIN' && (
+        {/* 수정 모드일 때만 정보 수정 창 표시 */}
+        {currentUser?.role === 'ADMIN' && adminMode === 'EDIT' && (
           <div className="admin-editor-box">
-            <h3>✏️ 관리자 수강 및 일정 정보 수정</h3>
+            <h3>✏️ 학원 수강 및 일정 수정 (수정 모드)</h3>
             <label>
-              <strong>이달의 일정 / 버스킹:</strong>
+              <strong>이달의 일정:</strong>
               <textarea rows={3} value={editForm.schedule} onChange={e => setEditForm({ ...editForm, schedule: e.target.value })} />
             </label>
             <label>
-              <strong>커리큘럼 공지:</strong>
+              <strong>커리큘럼:</strong>
               <textarea rows={3} value={editForm.curriculum} onChange={e => setEditForm({ ...editForm, curriculum: e.target.value })} />
             </label>
-            <button className="save-btn" onClick={handleSaveAcademyData}>💾 변경사항 저장하기</button>
+            <button className="save-btn" onClick={handleSaveAcademyData}>💾 저장하기</button>
           </div>
         )}
 
         {/* 1. 학원소개 */}
         {activeTab === 'about' && (
           <section className="tab-content">
-            <h2>🎧 아인클랑과 함께하는 음악 퍼포먼스</h2>
+            <h2>🎧 아인클랑 퍼포먼스</h2>
             <div className="video-container">
               <iframe src="https://www.youtube.com/embed/QzKwMGicdwU" title="Performance" allowFullScreen></iframe>
             </div>
@@ -760,7 +864,7 @@ export default function App() {
           </section>
         )}
 
-        {/* 5. 게시판 */}
+        {/* 5. 자유 게시판 */}
         {activeTab === 'board' && (
           <section className="tab-content text-left">
             <div className="board-top-header">
@@ -787,7 +891,7 @@ export default function App() {
                 />
                 <textarea
                   rows={4}
-                  placeholder="내용을 입력하세요. (유튜브 주소나 이미지 URL 포함 가능)"
+                  placeholder="내용을 입력하세요. (유튜브 주소나 이미지 URL 지원)"
                   value={newContent}
                   onChange={e => setNewContent(e.target.value)}
                   className="input-field text-area"
@@ -797,7 +901,6 @@ export default function App() {
               </form>
             )}
 
-            {/* 게시글 리스트 */}
             <div className="posts-list">
               {posts.length === 0 ? (
                 <div className="empty-posts">등록된 게시물이 없습니다.</div>
@@ -820,7 +923,13 @@ export default function App() {
 
                       {renderPostContent(post.id, post.content)}
 
-                      {/* 댓글 목록 */}
+                      {/* 좋아요 버튼 추가 */}
+                      <div className="post-actions">
+                        <button className="like-btn" onClick={() => handleToggleLike(post.id)}>
+                          ❤️ 좋아요 {post.likes > 0 && `(${post.likes})`}
+                        </button>
+                      </div>
+
                       <div className="comments-section">
                         <h4>💬 댓글 ({post.comments?.length || 0})</h4>
 
@@ -842,7 +951,6 @@ export default function App() {
                           </div>
                         )}
 
-                        {/* 댓글 리스트 (최신 댓글이 위로 쌓임) */}
                         <div className="comments-list">
                           {post.comments?.map(c => (
                             <div key={c.id} className="comment-item">
@@ -868,37 +976,90 @@ export default function App() {
           </section>
         )}
 
-        {/* 6. 내 QR 코드 (회원 전용) */}
+        {/* 6. 마이 QR 코드 및 본인 등/하원 시간 확인 (원생 전용) */}
         {activeTab === 'qr' && currentUser?.role === 'USER' && (
           <section className="tab-content text-center">
-            <h2>📱 나의 출석 QR 코드</h2>
-            <div className="qr-container">
-              <QRCodeSVG
-                value={JSON.stringify({ studentId: currentUser.id, name: currentUser.name })}
-                size={220}
-                level="H"
-              />
-              <h3>{currentUser.name} 원생</h3>
-              <p className="desc-text">학원 데스크에 설치된 스캐너에 QR 코드를 찍어주세요.</p>
-            </div>
+            <h2>📱 마이 QR & 출석 정보</h2>
+            {currentUser.category === 'GENERAL' ? (
+              <div className="info-box-general">
+                <h3>일반 회원 (글쓰기 전용 계정)</h3>
+                <p>일반 회원은 학원 등/하원 QR 코드가 발급되지 않습니다.</p>
+              </div>
+            ) : (
+              <>
+                <div className="qr-container">
+                  <QRCodeSVG
+                    value={JSON.stringify({ studentId: currentUser.id, name: currentUser.name })}
+                    size={220}
+                    level="H"
+                  />
+                  <h3>{currentUser.name} ({CATEGORY_LABELS[currentUser.category]})</h3>
+                  <p className="desc-text">데스크에 설치된 스캐너에 QR 코드를 찍어주세요.</p>
+                </div>
+
+                {/* 본인의 출석 및 등/하원 기록 */}
+                <div className="my-attendance-history">
+                  <h3>📜 나의 등 / 하원 기록</h3>
+                  <div className="table-responsive">
+                    <table className="attendance-table">
+                      <thead>
+                        <tr>
+                          <th>날짜</th>
+                          <th>등원 시간</th>
+                          <th>하원 시간</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {attendances.filter(a => a.userId === currentUser.id).length === 0 ? (
+                          <tr>
+                            <td colSpan={3} style={{ textAlign: 'center', padding: '16px' }}>출석 기록이 없습니다.</td>
+                          </tr>
+                        ) : (
+                          attendances
+                            .filter(a => a.userId === currentUser.id)
+                            .map(a => (
+                              <tr key={a.id}>
+                                <td>{a.date}</td>
+                                <td><span className="badge-in">{a.checkIn}</span></td>
+                                <td>
+                                  {a.checkOut ? (
+                                    <span className="badge-out">{a.checkOut}</span>
+                                  ) : (
+                                    <span className="badge-pending">수업 중</span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            )}
           </section>
         )}
 
-        {/* 7. QR 스캐너 (관리자 전용) */}
-        {activeTab === 'qr' && currentUser?.role === 'ADMIN' && (
-          <section className="tab-content text-center">
-            <h2>📷 출석 체크 QR 스캐너</h2>
-            <p className="desc-text mb-12">원생의 QR 코드를 카메라에 스캔해주세요. (오늘 첫 스캔: 등원 / 두번째 스캔: 하원)</p>
-            <div id="qr-reader" style={{ maxWidth: '400px', margin: '0 auto' }}></div>
-          </section>
-        )}
-
-        {/* 8. 출석 기록 관리 (관리자 전용) */}
+        {/* 7. 관리자 출석부 및 전체 통계 */}
         {activeTab === 'attendance' && currentUser?.role === 'ADMIN' && (
           <section className="tab-content text-left">
-            <h2>📊 출석 기록 및 통계</h2>
+            <h2>📊 부문별 등록 인원 현황</h2>
 
-            {/* 필터 설정 */}
+            {/* 그룹별 전체 회원 수 통계 카운팅 */}
+            <div className="category-stats-grid">
+              {(['KIDS', 'ELEMENTARY', 'MIDDLE', 'HIGH', 'ADULT', 'GENERAL'] as UserCategory[]).map(cat => {
+                const count = users.filter(u => u.category === cat && u.role !== 'ADMIN').length
+                return (
+                  <div key={cat} className="stat-card">
+                    <span className="stat-label">{CATEGORY_LABELS[cat]}</span>
+                    <span className="stat-count">{count} 명</span>
+                  </div>
+                )
+              })}
+            </div>
+
+            <h2 style={{ marginTop: '24px' }}>📋 원생 출석/등하원 기록</h2>
+
             <div className="filter-bar">
               <button className={filterMode === 'ALL' ? 'active' : ''} onClick={() => setFilterMode('ALL')}>전체 보기</button>
               <button className={filterMode === 'DAILY' ? 'active' : ''} onClick={() => setFilterMode('DAILY')}>일별 조회</button>
@@ -914,12 +1075,12 @@ export default function App() {
               )}
             </div>
 
-            {/* 출석 테이블 */}
             <div className="table-responsive">
               <table className="attendance-table">
                 <thead>
                   <tr>
                     <th>날짜</th>
+                    <th>구분</th>
                     <th>이름 (ID)</th>
                     <th>등원 시간</th>
                     <th>하원 시간</th>
@@ -928,12 +1089,13 @@ export default function App() {
                 <tbody>
                   {getFilteredAttendances().length === 0 ? (
                     <tr>
-                      <td colSpan={4} style={{ textAlign: 'center', padding: '20px' }}>출석 기록이 없습니다.</td>
+                      <td colSpan={5} style={{ textAlign: 'center', padding: '20px' }}>출석 기록이 없습니다.</td>
                     </tr>
                   ) : (
                     getFilteredAttendances().map(a => (
                       <tr key={a.id}>
                         <td>{a.date}</td>
+                        <td><span className="cat-badge">{CATEGORY_LABELS[a.category]}</span></td>
                         <td>{a.userName} ({a.userId})</td>
                         <td><span className="badge-in">{a.checkIn}</span></td>
                         <td>
