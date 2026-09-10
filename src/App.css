@@ -1245,23 +1245,62 @@ body {
   margin-top: 10px;
 }
 
+/* 상단 인증 및 탈퇴 버튼 영역 */
+.auth-action-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.auth-sub-links {
+  margin-top: 12px;
+  font-size: 0.8rem;
+  color: #94a3b8;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.auth-sub-links span {
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.category-select {
+  width: 100%;
+  padding: 8px;
+  background: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.input-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: #cbd5e1;
+  text-align: left;
+}
+
 /* 관리자 모드 셀렉터 */
 .admin-mode-selector {
   display: flex;
-  gap: 4px;
-  background: rgba(15, 23, 42, 0.6);
+  background: rgba(15, 23, 42, 0.8);
   padding: 2px;
   border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .admin-mode-selector button {
   background: transparent;
   color: #94a3b8;
   border: none;
-  padding: 4px 8px;
-  font-size: 0.8rem;
-  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
   cursor: pointer;
+  border-radius: 6px;
 }
 
 .admin-mode-selector button.active {
@@ -1270,14 +1309,14 @@ body {
   font-weight: 700;
 }
 
-/* 전체 화면 QR 스캐너 모드 */
-.full-qr-mode-screen {
+/* QR 풀스크린 전용 모드 */
+.qr-fullscreen-mode {
   position: fixed;
   top: 0;
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: #0f172a;
+  background: #090d16;
   z-index: 9999;
   display: flex;
   flex-direction: column;
@@ -1286,99 +1325,123 @@ body {
   padding: 20px;
 }
 
-.qr-mode-header {
-  margin-bottom: 24px;
+.qr-fullscreen-header {
+  position: absolute;
+  top: 20px;
+  width: 90%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.exit-qr-btn {
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid #ef4444;
+  color: #fca5a5;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.qr-instruction {
+  font-size: 1.2rem;
+  color: #38bdf8;
+  margin-bottom: 20px;
+}
+
+/* 사이트 QR 영역 */
+.site-qr-section {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: rgba(30, 41, 59, 0.5);
+  border-radius: 12px;
   text-align: center;
 }
 
-.exit-qr-mode-btn {
-  background: #ef4444;
-  color: white;
-  border: none;
-  padding: 10px 18px;
-  border-radius: 8px;
-  cursor: pointer;
-  margin-top: 12px;
-  font-weight: 700;
+.site-qr-box {
+  display: inline-block;
+  background: #fff;
+  padding: 12px;
+  border-radius: 12px;
+  margin-top: 10px;
 }
 
-/* 통계 카운트 카드 */
+/* 좋아요 버튼 */
+.like-action-bar {
+  margin: 12px 0;
+}
+
+.like-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #f8fafc;
+  padding: 6px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+
+.like-btn.liked {
+  background: #0284c7;
+  border-color: #38bdf8;
+  color: #fff;
+}
+
+/* 부문별 통계 카드 */
 .category-stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 12px;
-  margin-bottom: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px;
+  margin-bottom: 1rem;
 }
 
 .stat-card {
   background: rgba(30, 41, 59, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.1);
   padding: 12px;
   border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
-.stat-label {
+.stat-cat {
   font-size: 0.8rem;
   color: #94a3b8;
 }
 
-.stat-count {
-  font-size: 1.2rem;
-  font-weight: bold;
+.stat-num {
+  font-size: 1.1rem;
+  font-weight: 700;
   color: #38bdf8;
-  margin-top: 4px;
-}
-
-/* 회원가입 셀렉트 폼 */
-.modal-select {
-  width: 100%;
-  padding: 10px;
-  margin: 6px 0 12px;
-  background: #0f172a;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #fff;
-  border-radius: var(--radius-sm);
-  font-size: 0.9rem;
 }
 
 .cat-badge {
   background: rgba(56, 189, 248, 0.15);
   color: #38bdf8;
-  padding: 2px 6px;
-  border-radius: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
   font-size: 0.8rem;
 }
 
-/* 좋아요 버튼 */
-.post-actions {
-  margin-top: 12px;
+.btn-danger {
+  background: #dc2626;
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
 }
 
-.like-btn {
-  background: rgba(244, 114, 182, 0.1);
-  border: 1px solid rgba(244, 114, 182, 0.3);
-  color: #f472b6;
-  padding: 6px 12px;
-  border-radius: 16px;
-  cursor: pointer;
+.warn-text {
+  color: #f87171;
   font-size: 0.85rem;
+  margin-bottom: 10px;
 }
 
 .delete-acc {
-  background: #ef4444;
-}
-
-.my-attendance-history {
-  margin-top: 2rem;
-  text-align: left;
-}
-
-.info-box-general {
-  background: rgba(30, 41, 59, 0.6);
-  padding: 2rem;
-  border-radius: 12px;
-  margin-top: 1rem;
+  background: rgba(239, 68, 68, 0.2) !important;
+  color: #fca5a5 !important;
+  border: 1px solid rgba(239, 68, 68, 0.4) !important;
 }
