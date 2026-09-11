@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import './App.css'
 import { db } from './firebase'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
@@ -112,11 +112,15 @@ function getWeekNumber(d: Date) {
   return Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
 }
 
-// HH:mm 포맷 변환
 function getFormattedTime(date: Date) {
   const hours = String(date.getHours()).padStart(2, '0')
   const minutes = String(date.getMinutes()).padStart(2, '0')
   return `${hours}:${minutes}`
+}
+
+// 분기 추출 유틸 (1: Q1, 2: Q2, 3: Q3, 4: Q4)
+function getQuarter(date: Date): number {
+  return Math.floor(date.getMonth() / 3) + 1
 }
 
 export default function App() {
@@ -164,9 +168,10 @@ export default function App() {
   const [targetAdminMode, setTargetAdminMode] = useState<AdminMode>('VIEW')
 
   // 관리자 출석 필터 및 현황
-  const [filterMode, setFilterMode] = useState<'ALL' | 'DAILY' | 'WEEKLY'>('ALL')
+  const [filterMode, setFilterMode] = useState<'ALL' | 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY'>('ALL')
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL')
+  const [searchStudentQuery, setSearchStudentQuery] = useState('')
 
   // QR 스캔 안내 메시지
   const [scanMessage, setScanMessage] = useState<string>('')
@@ -433,7 +438,7 @@ export default function App() {
     await saveDataToFirebase(academyData, updatedPosts, users, attendances)
   }
 
-  // 댓글 등록 (최신 댓글이 상단에 배치)
+  // 댓글 등록
   const handleAddComment = async (postId: string) => {
     if (!currentUser) {
       alert('로그인이 필요합니다.')
@@ -527,25 +532,167 @@ export default function App() {
     await saveDataToFirebase(academyData, updatedPosts, users, attendances)
   }
 
-  // 출석 데이터 필터링
+  // 출석 데이터 필터링 (일, 주, 월, 분기, 연도 조건 반영)
   const getFilteredAttendances = () => {
     let list = [...attendances]
+
     if (selectedCategory !== 'ALL') {
       list = list.filter(a => a.userCategory === selectedCategory)
     }
+
+    if (searchStudentQuery.trim()) {
+      const query = searchStudentQuery.toLowerCase().trim()
+      list = list.filter(a => a.userName.toLowerCase().includes(query) || a.userId.toLowerCase().includes(query))
+    }
+
+    const refDate = new Date(selectedDate)
+    const refYear = refDate.getFullYear()
+    const refMonth = refDate.getMonth()
+    const refQuarter = getQuarter(refDate)
+    const refWeek = getWeekNumber(refDate)
+
     if (filterMode === 'DAILY') {
       list = list.filter(a => a.date === selectedDate)
     } else if (filterMode === 'WEEKLY') {
-      const targetDate = new Date(selectedDate)
-      const targetWeek = getWeekNumber(targetDate)
-      const targetYear = targetDate.getFullYear()
       list = list.filter(a => {
         const d = new Date(a.date)
-        return d.getFullYear() === targetYear && getWeekNumber(d) === targetWeek
+        return d.getFullYear() === refYear && getWeekNumber(d) === refWeek
+      })
+    } else if (filterMode === 'MONTHLY') {
+      list = list.filter(a => {
+        const d = new Date(a.date)
+        return d.getFullYear() === refYear && d.getMonth() === refMonth
+      })
+    } else if (filterMode === 'QUARTERLY') {
+      list = list.filter(a => {
+        const d = new Date(a.date)
+        return d.getFullYear() === refYear && getQuarter(d) === refQuarter
+      })
+    } else if (filterMode === 'YEARLY') {
+      list = list.filter(a => {
+        const d = new Date(a.date)
+        return d.getFullYear() === refYear
       })
     }
+
     return list
   }
+
+  // 학원 관리를 위한 출석 통계 계산 (주, 월, 분기, 연간, 등원 시간대 및 그래프용 데이터)
+  const attendanceAnalytics = useMemo(() => {
+    const now = new Date(selectedDate)
+    const currentYear = now.getFullYear()
+    const currentMonth = now.getMonth()
+    const currentQuarter = getQuarter(now)
+
+    // 원생별 누적 출석일 계산 (중복 날짜 제거)
+    const studentStats: Record<string, {
+      userId: string
+      userName: string
+      category: UserCategory
+      monthlyDays: Set<string>
+      quarterlyDays: Set<string>
+      yearlyDays: Set<string>
+      totalDays: Set<string>
+      checkInTimes: string[]
+    }> = {}
+
+    // 초기화
+    users.filter(u => u.role !== 'ADMIN').forEach(u => {
+      studentStats[u.id] = {
+        userId: u.id,
+        userName: u.name,
+        category: u.category,
+        monthlyDays: new Set(),
+        quarterlyDays: new Set(),
+        yearlyDays: new Set(),
+        totalDays: new Set(),
+        checkInTimes: []
+      }
+    })
+
+    // 등원 시간대 분포 (오전: ~12시, 오후: 12~17시, 저녁: 17시~)
+    let morningCount = 0
+    let afternoonCount = 0
+    let eveningCount = 0
+
+    // 요일별 출석 수 (월~일)
+    const dayOfWeekCounts = [0, 0, 0, 0, 0, 0, 0] // 0:일, 1:월, ... 6:토
+
+    // 최근 7일 일별 출석자수
+    const recent7DaysMap: Record<string, Set<string>> = {}
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now)
+      d.setDate(d.getDate() - i)
+      const dStr = d.toISOString().split('T')[0]
+      recent7DaysMap[dStr] = new Set()
+    }
+
+    attendances.forEach(a => {
+      const aDate = new Date(a.date)
+      const year = aDate.getFullYear()
+      const month = aDate.getMonth()
+      const quarter = getQuarter(aDate)
+
+      if (!studentStats[a.userId]) {
+        studentStats[a.userId] = {
+          userId: a.userId,
+          userName: a.userName,
+          category: a.userCategory,
+          monthlyDays: new Set(),
+          quarterlyDays: new Set(),
+          yearlyDays: new Set(),
+          totalDays: new Set(),
+          checkInTimes: []
+        }
+      }
+
+      const st = studentStats[a.userId]
+      st.totalDays.add(a.date)
+
+      if (year === currentYear) {
+        st.yearlyDays.add(a.date)
+        if (quarter === currentQuarter) {
+          st.quarterlyDays.add(a.date)
+        }
+        if (month === currentMonth) {
+          st.monthlyDays.add(a.date)
+        }
+      }
+
+      if (a.checkIn) {
+        st.checkInTimes.push(a.checkIn)
+        const hour = parseInt(a.checkIn.split(':')[0], 10)
+        if (hour < 12) morningCount++
+        else if (hour < 17) afternoonCount++
+        else eveningCount++
+      }
+
+      // 요일 집계
+      const dayIdx = aDate.getDay()
+      dayOfWeekCounts[dayIdx]++
+
+      // 최근 7일 집계
+      if (recent7DaysMap[a.date]) {
+        recent7DaysMap[a.date].add(a.userId)
+      }
+    })
+
+    const totalCheckIns = attendances.length || 1
+    const morningRatio = Math.round((morningCount / totalCheckIns) * 100)
+    const afternoonRatio = Math.round((afternoonCount / totalCheckIns) * 100)
+    const eveningRatio = Math.round((eveningCount / totalCheckIns) * 100)
+
+    const maxDayCount = Math.max(...dayOfWeekCounts, 1)
+
+    return {
+      studentStats: Object.values(studentStats),
+      timeDistribution: { morningCount, afternoonCount, eveningCount, morningRatio, afternoonRatio, eveningRatio },
+      dayOfWeekCounts,
+      maxDayCount,
+      recent7DaysMap
+    }
+  }, [attendances, users, selectedDate])
 
   // 포맷 텍스트 렌더링
   const renderFormattedContent = (text: string) => {
@@ -739,7 +886,6 @@ export default function App() {
               {authMode === 'DELETE_ACCOUNT' && '회원 탈퇴'}
             </h3>
 
-            {/* 로그인 폼 */}
             {authMode === 'LOGIN' && (
               <form onSubmit={handleLogin}>
                 <input type="text" placeholder="아이디" value={loginId} onChange={e => setLoginId(e.target.value)} required />
@@ -756,7 +902,6 @@ export default function App() {
               </form>
             )}
 
-            {/* 회원가입 폼 */}
             {authMode === 'REGISTER' && (
               <form onSubmit={handleRegister}>
                 <input type="text" placeholder="아이디" value={regId} onChange={e => setRegId(e.target.value)} required />
@@ -775,7 +920,7 @@ export default function App() {
                   </select>
                 </label>
 
-                <textarea placeholder="아인클랑에 온 이유" value={regReason} onChange={e => setRegReason(e.target.value)} className="modal-textarea" required />
+                <textarea placeholder="당신은 무엇을 좋아하나요?(사람,물건,음식..등.)" value={regReason} onChange={e => setRegReason(e.target.value)} className="modal-textarea" required />
                 <div className="modal-buttons">
                   <button type="submit" className="btn-confirm">가입 완료</button>
                   <button type="button" className="btn-cancel" onClick={() => setShowAuthModal(false)}>취소</button>
@@ -786,7 +931,6 @@ export default function App() {
               </form>
             )}
 
-            {/* 회원 탈퇴 폼 */}
             {authMode === 'DELETE_ACCOUNT' && (
               <form onSubmit={handleSelfDelete}>
                 <p className="warn-text">⚠️ 비밀번호를 잊으신 경우 관리자에게 요청해주세요.</p>
@@ -813,12 +957,10 @@ export default function App() {
         <button className={activeTab === 'instructors' ? 'active' : ''} onClick={() => setActiveTab('instructors')}>강사진</button>
         <button className={activeTab === 'board' ? 'active' : ''} onClick={() => setActiveTab('board')}>게시판</button>
 
-        {/* 유저 전용 QR 탭 (일반 회원 제외) */}
         {currentUser && currentUser.role === 'USER' && currentUser.category !== 'GENERAL' && (
           <button className={activeTab === 'qr' ? 'active' : ''} onClick={() => setActiveTab('qr')}>📱 내 QR코드 & 출석</button>
         )}
 
-        {/* 관리자 탭 (수정모드/관찰모드에 따라 QR탭 노출 제한) */}
         {currentUser && currentUser.role === 'ADMIN' && (
           <>
             {adminMode === 'EDIT' && (
@@ -831,7 +973,6 @@ export default function App() {
 
       {/* Main Content */}
       <main className="academy-content">
-        {/* 수정 모드 전용 학원 정보 편집기 */}
         {currentUser?.role === 'ADMIN' && adminMode === 'EDIT' && (
           <div className="admin-editor-box">
             <h3>✏️ [수정 모드] 학원 콘텐츠 관리</h3>
@@ -858,8 +999,7 @@ export default function App() {
             <div className="video-container">
               <iframe src="https://www.youtube.com/embed/QzKwMGicdwU" title="Performance" allowFullScreen></iframe>
             </div>
-            
-            {/* 학원 웹사이트 바로가기 QR 코드 */}
+
             <div className="site-qr-box">
               <h3>📱 아인클랑 스마트폰 연결 QR</h3>
               <p>카메라로 아래 QR을 스캔하면 바로 모바일 웹사이트로 연결됩니다.</p>
@@ -954,7 +1094,6 @@ export default function App() {
 
                     {renderPostContent(post.id, post.content)}
 
-                    {/* 좋아요 버튼 영역 */}
                     <div className="post-actions">
                       <button
                         className={`like-btn ${isLiked ? 'liked' : ''}`}
@@ -964,7 +1103,6 @@ export default function App() {
                       </button>
                     </div>
 
-                    {/* 댓글 섹션 */}
                     <div className="comments-section">
                       <h4>💬 댓글 ({post.comments?.length || 0})</h4>
 
@@ -984,7 +1122,6 @@ export default function App() {
                         </div>
                       )}
 
-                      {/* 댓글 목록 (상단일수록 최신) */}
                       <div className="comments-list">
                         {post.comments?.map(c => (
                           <div key={c.id} className="comment-item">
@@ -1009,10 +1146,10 @@ export default function App() {
           </section>
         )}
 
-        {/* 6. 개인 QR코드 및 내 출석 시간 확인 (일반 회원 제외) */}
+        {/* 6. 개인 QR코드 및 내 출석 통계 (학생) */}
         {activeTab === 'qr' && currentUser?.role === 'USER' && currentUser.category !== 'GENERAL' && (
           <section className="tab-content text-center">
-            <h2>📱 나의 출석 QR 코드 및 등/하원 시간</h2>
+            <h2>📱 나의 출석 QR 코드 및 출석 통계</h2>
             <div className="qr-container">
               <QRCodeSVG
                 value={JSON.stringify({ studentId: currentUser.id, name: currentUser.name })}
@@ -1022,28 +1159,53 @@ export default function App() {
               <h3>{currentUser.name} 원생 ({CATEGORY_LABELS[currentUser.category]})</h3>
             </div>
 
-            {/* 본인 출석 기록 테이블 */}
+            {/* 개별 학생 출석 통계 카운트 */}
+            {(() => {
+              const myStats = attendanceAnalytics.studentStats.find(s => s.userId === currentUser.id)
+              return (
+                <div className="my-stats-summary-grid">
+                  <div className="stat-card">
+                    <span className="stat-label">이달(월별) 출석일</span>
+                    <span className="stat-value">{myStats?.monthlyDays.size || 0}일</span>
+                  </div>
+                  <div className="stat-card">
+                    <span className="stat-label">분기별 출석일</span>
+                    <span className="stat-value">{myStats?.quarterlyDays.size || 0}일</span>
+                  </div>
+                  <div className="stat-card">
+                    <span className="stat-label">올해(연간) 출석일</span>
+                    <span className="stat-value">{myStats?.yearlyDays.size || 0}일</span>
+                  </div>
+                </div>
+              )
+            })()}
+
             <div className="my-attendance-box">
-              <h3>📅 내 최근 출석 기록</h3>
+              <h3>📅 내 최근 출석 및 등원 시간 상세</h3>
               <table className="attendance-table">
                 <thead>
                   <tr>
                     <th>날짜</th>
+                    <th>주차</th>
                     <th>등원 시간</th>
                     <th>하원 시간</th>
                   </tr>
                 </thead>
                 <tbody>
                   {attendances.filter(a => a.userId === currentUser.id).length === 0 ? (
-                    <tr><td colSpan={3}>출석 기록이 없습니다.</td></tr>
+                    <tr><td colSpan={4}>출석 기록이 없습니다.</td></tr>
                   ) : (
-                    attendances.filter(a => a.userId === currentUser.id).map(a => (
-                      <tr key={a.id}>
-                        <td>{a.date}</td>
-                        <td><span className="badge-in">{a.checkIn}</span></td>
-                        <td>{a.checkOut ? <span className="badge-out">{a.checkOut}</span> : <span className="badge-pending">수업 중</span>}</td>
-                      </tr>
-                    ))
+                    attendances.filter(a => a.userId === currentUser.id).map(a => {
+                      const d = new Date(a.date)
+                      return (
+                        <tr key={a.id}>
+                          <td>{a.date}</td>
+                          <td>{getWeekNumber(d)}주차</td>
+                          <td><span className="badge-in">{a.checkIn}</span></td>
+                          <td>{a.checkOut ? <span className="badge-out">{a.checkOut}</span> : <span className="badge-pending">수업 중</span>}</td>
+                        </tr>
+                      )
+                    })
                   )}
                 </tbody>
               </table>
@@ -1051,7 +1213,7 @@ export default function App() {
           </section>
         )}
 
-        {/* 7. 관리자 전용 QR 스캐너 (수정모드) */}
+        {/* 7. 관리자 전용 QR 스캐너 */}
         {activeTab === 'qr' && currentUser?.role === 'ADMIN' && adminMode === 'EDIT' && (
           <section className="tab-content text-center">
             <h2>📷 출석 체크 QR 스캐너</h2>
@@ -1064,10 +1226,12 @@ export default function App() {
           </section>
         )}
 
-        {/* 8. 관리자 전체 현황 / 출석 / 회원 삭제 및 통계 */}
+        {/* 8. 출석 및 회원 관리 + 종합 대시보드 그래프 */}
         {activeTab === 'attendance' && currentUser?.role === 'ADMIN' && (
           <section className="tab-content text-left">
-            <h2>📊 카테고리별 회원 수 현황</h2>
+            <h2>📊 학원 관리 및 출석 통계 리포트</h2>
+
+            {/* 회원수 현황 */}
             <div className="count-grid">
               {(Object.keys(CATEGORY_LABELS) as UserCategory[]).map(catKey => {
                 const count = users.filter(u => u.role !== 'ADMIN' && u.category === catKey).length
@@ -1084,7 +1248,100 @@ export default function App() {
               </div>
             </div>
 
-            <h2>📋 전체 회원 관리 및 강제 탈퇴</h2>
+            {/* 학원 관리 그래프 섹션 */}
+            <div className="analytics-section">
+              <h3>📈 학원 관리를 위한 출석 분석 그래프</h3>
+
+              {/* 시간대별 등원 분포 그래프 */}
+              <div className="chart-card">
+                <h4>⏰ 등원 시간대별 분포 비율</h4>
+                <div className="time-bar-container">
+                  <div className="time-bar-segment morning" style={{ width: `${attendanceAnalytics.timeDistribution.morningRatio}%` }}>
+                    {attendanceAnalytics.timeDistribution.morningRatio > 10 && `오전 ${attendanceAnalytics.timeDistribution.morningRatio}%`}
+                  </div>
+                  <div className="time-bar-segment afternoon" style={{ width: `${attendanceAnalytics.timeDistribution.afternoonRatio}%` }}>
+                    {attendanceAnalytics.timeDistribution.afternoonRatio > 10 && `오후 ${attendanceAnalytics.timeDistribution.afternoonRatio}%`}
+                  </div>
+                  <div className="time-bar-segment evening" style={{ width: `${attendanceAnalytics.timeDistribution.eveningRatio}%` }}>
+                    {attendanceAnalytics.timeDistribution.eveningRatio > 10 && `저녁 ${attendanceAnalytics.timeDistribution.eveningRatio}%`}
+                  </div>
+                </div>
+                <div className="chart-legend">
+                  <span className="legend-item morning">오전(~12시): {attendanceAnalytics.timeDistribution.morningCount}회</span>
+                  <span className="legend-item afternoon">오후(12~17시): {attendanceAnalytics.timeDistribution.afternoonCount}회</span>
+                  <span className="legend-item evening">저녁(17시~): {attendanceAnalytics.timeDistribution.eveningCount}회</span>
+                </div>
+              </div>
+
+              {/* 요일별 출석 분포 그래프 */}
+              <div className="chart-card">
+                <h4>🗓️ 요일별 누적 출석 분포</h4>
+                <div className="weekday-bar-chart">
+                  {['일', '월', '화', '수', '목', '금', '토'].map((dayName, idx) => {
+                    const count = attendanceAnalytics.dayOfWeekCounts[idx]
+                    const heightPercent = Math.round((count / attendanceAnalytics.maxDayCount) * 100)
+                    return (
+                      <div key={dayName} className="bar-col">
+                        <span className="bar-value">{count}회</span>
+                        <div className="bar-track">
+                          <div className="bar-fill" style={{ height: `${heightPercent}%` }}></div>
+                        </div>
+                        <span className="bar-label">{dayName}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* 최근 7일 등원 인원 그래프 */}
+              <div className="chart-card">
+                <h4>📆 최근 7일간 일별 등원 원생수</h4>
+                <div className="recent-trend-grid">
+                  {Object.entries(attendanceAnalytics.recent7DaysMap).map(([dateStr, studentSet]) => (
+                    <div key={dateStr} className="trend-item">
+                      <span className="trend-date">{dateStr.slice(5)}</span>
+                      <span className="trend-count">{studentSet.size}명</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* 원생별 월/분기/연간 출석일 집계표 */}
+            <h2>🗓️ 원생별 주/월/분기/연간 출석일수 요약</h2>
+            <div className="table-responsive mb-24">
+              <table className="attendance-table">
+                <thead>
+                  <tr>
+                    <th>이름 (ID)</th>
+                    <th>분류</th>
+                    <th>이달 출석일</th>
+                    <th>분기 출석일</th>
+                    <th>올해 출석일</th>
+                    <th>총 누적 출석일</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {attendanceAnalytics.studentStats.length === 0 ? (
+                    <tr><td colSpan={6} style={{ textAlign: 'center', padding: '16px' }}>원생 정보가 없습니다.</td></tr>
+                  ) : (
+                    attendanceAnalytics.studentStats.map(st => (
+                      <tr key={st.userId}>
+                        <td><strong>{st.userName}</strong> ({st.userId})</td>
+                        <td>{CATEGORY_LABELS[st.category]}</td>
+                        <td><span className="badge-highlight">{st.monthlyDays.size}일</span></td>
+                        <td>{st.quarterlyDays.size}일</td>
+                        <td>{st.yearlyDays.size}일</td>
+                        <td>{st.totalDays.size}일</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* 회원 상세 목록 및 탈퇴 */}
+            <h2>📋 전체 회원 관리 및 회원 삭제</h2>
             <div className="table-responsive mb-24">
               <table className="attendance-table">
                 <thead>
@@ -1092,7 +1349,7 @@ export default function App() {
                     <th>아이디</th>
                     <th>이름</th>
                     <th>분류</th>
-                    <th>가입 동기</th>
+                    <th>좋아하는 것</th>
                     <th>관리</th>
                   </tr>
                 </thead>
@@ -1121,7 +1378,8 @@ export default function App() {
               </table>
             </div>
 
-            <h2>⏱️ 항목별 등/하원 출석 기록</h2>
+            {/* 등/하원 출석 기록 필터링 및 조회 */}
+            <h2>⏱️ 주/월/분기/연도별 등원 상세 기록</h2>
             <div className="filter-bar">
               <select value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)} className="select-filter">
                 <option value="ALL">전체 카테고리</option>
@@ -1133,10 +1391,18 @@ export default function App() {
               <button className={filterMode === 'ALL' ? 'active' : ''} onClick={() => setFilterMode('ALL')}>전체 보기</button>
               <button className={filterMode === 'DAILY' ? 'active' : ''} onClick={() => setFilterMode('DAILY')}>일별</button>
               <button className={filterMode === 'WEEKLY' ? 'active' : ''} onClick={() => setFilterMode('WEEKLY')}>주별</button>
+              <button className={filterMode === 'MONTHLY' ? 'active' : ''} onClick={() => setFilterMode('MONTHLY')}>월별</button>
+              <button className={filterMode === 'QUARTERLY' ? 'active' : ''} onClick={() => setFilterMode('QUARTERLY')}>분기별</button>
+              <button className={filterMode === 'YEARLY' ? 'active' : ''} onClick={() => setFilterMode('YEARLY')}>연간</button>
 
-              {filterMode !== 'ALL' && (
-                <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} className="date-picker-input" />
-              )}
+              <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} className="date-picker-input" />
+              <input
+                type="text"
+                placeholder="학생 이름/ID 검색..."
+                value={searchStudentQuery}
+                onChange={e => setSearchStudentQuery(e.target.value)}
+                className="search-input"
+              />
             </div>
 
             <div className="table-responsive">
@@ -1144,6 +1410,7 @@ export default function App() {
                 <thead>
                   <tr>
                     <th>날짜</th>
+                    <th>주차</th>
                     <th>분류</th>
                     <th>이름 (ID)</th>
                     <th>등원 시간 (시:분)</th>
@@ -1152,17 +1419,21 @@ export default function App() {
                 </thead>
                 <tbody>
                   {getFilteredAttendances().length === 0 ? (
-                    <tr><td colSpan={5} style={{ textAlign: 'center', padding: '20px' }}>출석 기록이 존재하지 않습니다.</td></tr>
+                    <tr><td colSpan={6} style={{ textAlign: 'center', padding: '20px' }}>출석 기록이 존재하지 않습니다.</td></tr>
                   ) : (
-                    getFilteredAttendances().map(a => (
-                      <tr key={a.id}>
-                        <td>{a.date}</td>
-                        <td>{CATEGORY_LABELS[a.userCategory]}</td>
-                        <td>{a.userName} ({a.userId})</td>
-                        <td><span className="badge-in">{a.checkIn}</span></td>
-                        <td>{a.checkOut ? <span className="badge-out">{a.checkOut}</span> : <span className="badge-pending">수업 중</span>}</td>
-                      </tr>
-                    ))
+                    getFilteredAttendances().map(a => {
+                      const d = new Date(a.date)
+                      return (
+                        <tr key={a.id}>
+                          <td>{a.date}</td>
+                          <td>{getWeekNumber(d)}주차</td>
+                          <td>{CATEGORY_LABELS[a.userCategory]}</td>
+                          <td>{a.userName} ({a.userId})</td>
+                          <td><span className="badge-in">{a.checkIn}</span></td>
+                          <td>{a.checkOut ? <span className="badge-out">{a.checkOut}</span> : <span className="badge-pending">수업 중</span>}</td>
+                        </tr>
+                      )
+                    })
                   )}
                 </tbody>
               </table>
