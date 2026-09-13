@@ -1399,3 +1399,15 @@ body {
   overflow: hidden;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 }
+
+/* 기본 PC 화면에서는 줄바꿈을 숨김 처리 */
+.mobile-break {
+  display: none;
+}
+
+/* 모바일 화면(예: 768px 이하)에서만 줄바꿈 적용 */
+@media (max-width: 768px) {
+  .mobile-break {
+    display: inline;
+  }
+}

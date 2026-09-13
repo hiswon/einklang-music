@@ -1256,7 +1256,7 @@ export default function App() {
             {/* 오시는 길 / 주소 및 지도가 추가된 카드 */}
             <div className="location-box">
               <h3>📍오시는 길</h3>
-              <p className="location-address">📌 울산 남구 무거동 옥현로 21 3층 (월계초 앞)</p>
+              <p className="location-address">📌 울산 남구 무거동 옥현로 21 3층 (월계초 앞)<br className="mobile-break" /></p>
               <div className="location-actions">
                 <a
                   href={GOOGLE_MAPS_URL}
