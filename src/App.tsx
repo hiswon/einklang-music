@@ -1022,7 +1022,7 @@ export default function App() {
           <div className="banner-overlay">
             <span className="badge-neon">EINKLANG MUSIC STUDIO</span>
             <h1>아인클랑 음악학원</h1>
-            <p className="subtitle">나만의 감성을 연주하다 · 보컬 | 통기타 & 핑거스타일 | 미디 & 작곡</p>
+            <p className="subtitle">나만의 감성을 연주하다 · 보컬 | <br className="mobile-break" /> 통기타 & 핑거스타일 | 미디 & 작곡</p>
           </div>
         </div>
 
@@ -1248,7 +1248,7 @@ export default function App() {
         {/* 1. 학원 소개 */}
         {activeTab === 'about' && (
           <section className="tab-content">
-            <h2>🎧 아인클랑과 함께하는 음악 퍼포먼스</h2>
+            <h2>🎧 아인클랑과 함께하는 <br className="mobile-break" />음악 퍼포먼스</h2>
             <div className="video-container">
               <iframe src="https://www.youtube.com/embed/QzKwMGicdwU" title="Performance" allowFullScreen></iframe>
             </div>
