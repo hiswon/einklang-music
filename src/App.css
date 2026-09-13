@@ -1348,37 +1348,3 @@ body {
   }
 }
 
-/* 7일 이전 출석 히스토리 칩 그리드 */
-.attendance-check-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.attendance-check-chip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(30, 41, 59, 0.8);
-  border: 1px solid rgba(56, 189, 248, 0.3);
-  padding: 6px 12px;
-  border-radius: 16px;
-  font-size: 0.85rem;
-  color: #f8fafc;
-}
-
-.attendance-check-chip .check-icon {
-  font-size: 0.8rem;
-}
-
-.attendance-check-chip .check-day {
-  color: #38bdf8;
-  font-weight: bold;
-}
-
-/* 통계 카드 - 원생 수 전용 스타일 */
-.count-card.student-total {
-  border-color: #38bdf8;
-  background: rgba(56, 189, 248, 0.15);
-}
