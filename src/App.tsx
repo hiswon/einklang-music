@@ -9,6 +9,7 @@ const HEADER_BG = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?
 const CLASS_IMG_1 = 'https://images.unsplash.com/photo-1510915361894-db8b60106cb1?q=80&w=800&auto=format&fit=crop'
 const CLASS_IMG_3 = 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?q=80&w=800&auto=format&fit=crop'
 const ACADEMY_URL = 'https://einklang-music.vercel.app/'
+const GOOGLE_MAPS_URL = 'https://maps.app.goo.gl/4KfQBpEm4k24QkhcA'
 
 export type UserCategory = 'GENERAL' | 'KIDS' | 'ELEMENTARY' | 'MIDDLE' | 'HIGH' | 'ADULT' | 'PARENT'
 
@@ -132,7 +133,6 @@ function getQuarter(date: Date): number {
   return Math.floor(date.getMonth() / 3) + 1
 }
 
-// 요일 구하기 헬퍼 함수
 function getDayOfWeekStr(dateStr: string): string {
   const days = ['일', '월', '화', '수', '목', '금', '토']
   const d = new Date(dateStr)
@@ -142,7 +142,6 @@ function getDayOfWeekStr(dateStr: string): string {
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('about')
 
-  // 기본 상태
   const [academyData, setAcademyData] = useState<AcademyData>({
     schedule: defaultSchedule,
     curriculum: '',
@@ -153,19 +152,16 @@ export default function App() {
   const [users, setUsers] = useState<User[]>(ADMIN_ACCOUNTS)
   const [attendances, setAttendances] = useState<AttendanceRecord[]>([])
 
-  // 공지사항 상태 (전체, 부별, 개인별)
   const [notices, setNotices] = useState<NoticeData>({
     globalNotice: '',
     categoryNotices: {},
     personalNotices: {}
   })
 
-  // 인증 및 로그인 사용자
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false)
   const [authMode, setAuthMode] = useState<'LOGIN' | 'REGISTER' | 'DELETE_ACCOUNT' | 'EDIT_PROFILE'>('LOGIN')
 
-  // 폼 입력값
   const [loginId, setLoginId] = useState('')
   const [loginPw, setLoginPw] = useState('')
   const [regId, setRegId] = useState('')
@@ -174,11 +170,9 @@ export default function App() {
   const [regReason, setRegReason] = useState('')
   const [regCategory, setRegCategory] = useState<UserCategory>('GENERAL')
 
-  // 학부모 가입 전용 입력값
   const [regChildName, setRegChildName] = useState('')
   const [regChildFood, setRegChildFood] = useState('')
 
-  // 회원 정보 수정 폼 입력값 (아이디 수정 기능 포함)
   const [editId, setEditId] = useState('')
   const [editName, setEditName] = useState('')
   const [editFood, setEditFood] = useState('')
@@ -187,37 +181,31 @@ export default function App() {
   const [delId, setDelId] = useState('')
   const [delPw, setDelPw] = useState('')
 
-  // 게시글
   const [showWriteForm, setShowWriteForm] = useState<boolean>(false)
   const [newTitle, setNewTitle] = useState('')
   const [newContent, setNewContent] = useState('')
   const [playingPostId, setPlayingPostId] = useState<string | null>(null)
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({})
 
-  // 관리자 제어
   const [editForm, setEditForm] = useState<AcademyData>(academyData)
   const [adminMode, setAdminMode] = useState<AdminMode>('VIEW')
   const [qrPassModal, setQrPassModal] = useState<boolean>(false)
   const [qrInputPass, setQrInputPass] = useState('')
   const [targetAdminMode, setTargetAdminMode] = useState<AdminMode>('VIEW')
 
-  // 관리자 공지 작성 임시 필드
   const [noticeCategory, setNoticeCategory] = useState<UserCategory>('KIDS')
   const [inputCategoryNotice, setInputCategoryNotice] = useState('')
   const [noticeTargetUserId, setNoticeTargetUserId] = useState('')
   const [inputPersonalNotice, setInputPersonalNotice] = useState('')
 
-  // 관리자 출석 필터 및 현황
   const [filterMode, setFilterMode] = useState<'ALL' | 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY'>('ALL')
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL')
   const [searchStudentQuery, setSearchStudentQuery] = useState('')
 
-  // QR 스캔 안내 메시지
   const [scanMessage, setScanMessage] = useState<string>('')
   const [scanMessageType, setScanMessageType] = useState<'in' | 'out' | 'error' | ''>('')
 
-  // Firebase 데이터 로드
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -271,7 +259,6 @@ export default function App() {
     }
   }
 
-  // 로그인
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
     const target = users.find(u => u.id === loginId && u.password === loginPw)
@@ -287,7 +274,6 @@ export default function App() {
     }
   }
 
-  // 회원가입 (학부모 검증 포함)
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!regId || !regPw || !regName || !regReason) {
@@ -346,7 +332,6 @@ export default function App() {
     alert(regCategory === 'PARENT' ? `학부모 가입이 완료되었습니다! (자녀: ${regChildName})` : '회원가입이 완료되었습니다!')
   }
 
-  // 회원 정보 수정 (아이디 변경 포함)
   const handleEditProfile = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!currentUser) return
@@ -359,13 +344,11 @@ export default function App() {
       return
     }
 
-    // 아이디 변경 시 중복 검사
     if (newId !== oldId && users.some(u => u.id === newId)) {
       alert('이미 존재하거나 사용 중인 아이디입니다.')
       return
     }
 
-    // 1. 유저 정보 업데이트 및 자녀/부모 연동 업데이트
     const updatedUsers = users.map(u => {
       if (u.id === oldId) {
         return {
@@ -382,7 +365,6 @@ export default function App() {
       return u
     })
 
-    // 2. 출석 기록 내 userId 업데이트
     const updatedAttendances = attendances.map(a => {
       if (a.userId === oldId) {
         return { ...a, userId: newId, userName: editName.trim() || a.userName }
@@ -390,7 +372,6 @@ export default function App() {
       return a
     })
 
-    // 3. 게시물 작성자 ID 업데이트
     const updatedPosts = posts.map(p => {
       let updatedP = { ...p }
       if (p.authorId === oldId) {
@@ -408,7 +389,6 @@ export default function App() {
       return updatedP
     })
 
-    // 4. 개인 공지사항 Key 업데이트
     const updatedNotices = { ...notices }
     if (updatedNotices.personalNotices[oldId]) {
       const noticeContent = updatedNotices.personalNotices[oldId]
@@ -429,7 +409,6 @@ export default function App() {
     alert('회원 정보 및 아이디가 성공적으로 수정되었습니다!')
   }
 
-  // 탈퇴 처리
   const handleSelfDelete = async (e: React.FormEvent) => {
     e.preventDefault()
     const target = users.find(u => u.id === delId && u.password === delPw)
@@ -481,7 +460,6 @@ export default function App() {
     }
   }
 
-  // QR 스캔 또는 수동 등하원 처리
   const processAttendance = async (scannedUserId: string) => {
     const student = users.find(u => u.id === scannedUserId)
     if (!student) {
@@ -535,14 +513,12 @@ export default function App() {
     await saveDataToFirebase(academyData, posts, users, updatedList, notices)
   }
 
-  // 수동 등하원 체크 (관리자 기능)
   const handleManualAttendance = async (studentId: string) => {
     const student = users.find(u => u.id === studentId)
     if (!student) return
     await processAttendance(student.id)
   }
 
-  // QR 스캐너 바인딩
   useEffect(() => {
     if (activeTab === 'qr' && currentUser?.role === 'ADMIN' && adminMode === 'QR') {
       const scanner = new Html5QrcodeScanner(
@@ -570,7 +546,6 @@ export default function App() {
     }
   }, [activeTab, currentUser, adminMode])
 
-  // 공지사항 저장 처리
   const handleSaveGlobalNotice = async (noticeStr: string) => {
     const updated = { ...notices, globalNotice: noticeStr }
     setNotices(updated)
@@ -598,7 +573,6 @@ export default function App() {
     alert('개인 맞춤 공지가 저장/업데이트되었습니다.')
   }
 
-  // 게시판 액션
   const handleLikePost = async (postId: string) => {
     if (!currentUser) {
       alert('로그인이 필요합니다.')
@@ -716,7 +690,6 @@ export default function App() {
     await saveDataToFirebase(academyData, updatedPosts, users, attendances, notices)
   }
 
-  // 필터링된 출석 목록
   const getFilteredAttendances = () => {
     let list = [...attendances]
 
@@ -762,7 +735,6 @@ export default function App() {
     return list
   }
 
-  // 대시보드 및 통계 계산
   const attendanceAnalytics = useMemo(() => {
     const now = new Date(selectedDate)
     const currentYear = now.getFullYear()
@@ -965,7 +937,6 @@ export default function App() {
     )
   }
 
-  // 현재 사용자/자녀의 QR코드 밑에 표시할 공지 목록 생성 렌더러 (학부모에게는 자녀 개인공지 안 보이도록 설정)
   const renderUserNotices = (targetUser: User, isParentView: boolean) => {
     const activeNotices: { type: string; text: string }[] = []
 
@@ -980,12 +951,10 @@ export default function App() {
       })
     }
 
-    // 학부모인 경우 학부모 개인공지가 있으면 표시
     if (isParentView && currentUser && notices.personalNotices[currentUser.id]?.trim()) {
       activeNotices.push({ type: '💌 학부모 개인 공지', text: notices.personalNotices[currentUser.id]! })
     }
 
-    // 부모가 아닐 때(학생 본인일 때)만 학생 개인 맞춤 공지 표시
     if (!isParentView && notices.personalNotices[targetUser.id]?.trim()) {
       activeNotices.push({ type: '💌 개인 맞춤 공지', text: notices.personalNotices[targetUser.id]! })
     }
@@ -1057,7 +1026,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* 상단 프로필 및 로그인 상태바 */}
         <div className="admin-bar">
           {currentUser ? (
             <div className="user-info-bar">
@@ -1098,7 +1066,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* Auth 및 프로필 수정 통합 모달 */}
+      {/* Auth 및 프로필 수정 모달 */}
       {showAuthModal && (
         <div className="modal-overlay">
           <div className="modal-content">
@@ -1285,6 +1253,36 @@ export default function App() {
               <iframe src="https://www.youtube.com/embed/QzKwMGicdwU" title="Performance" allowFullScreen></iframe>
             </div>
 
+            {/* 오시는 길 / 주소 및 지도가 추가된 카드 */}
+            <div className="location-box">
+              <h3>📍오시는 길</h3>
+              <p className="location-address">📌 울산 남구 무거동 옥현로 21 3층 (월계초 앞)</p>
+              <div className="location-actions">
+                <a
+                  href={GOOGLE_MAPS_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="map-link-btn"
+                >
+                  🗺️ Google 지도에서 위치 보기
+                </a>
+              </div>
+
+              <div className="map-iframe-wrapper">
+                
+                <iframe
+                  title="Google Maps Location"
+                  src="https://www.google.com/maps/embed?pb=!1m5!3m3!1m2!1s0x35662d934d7d169f%3A0x400bd06b53cf9486!2z7JWE7J247YG0656R7J2M7JWF7ZWZ7JuQ!5e0!3m2!1sko!2skr!4v1789316730739!5m2!1sko!2skr"
+                  width="100%"
+                  height="260"
+                  style={{ border: 0, borderRadius: '12px' }}
+                  allowFullScreen={false}
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                ></iframe>
+              </div>
+            </div>
+
             <div className="site-qr-box">
               <h3>📱 아인클랑 스마트폰 연결 QR</h3>
               <p>카메라로 아래 QR을 스캔하면 바로 모바일 웹사이트로 연결됩니다.</p>
@@ -1336,7 +1334,7 @@ export default function App() {
           </section>
         )}
 
-        {/* 5. 자유 게시판 (이름 대신 아이디 노출) */}
+        {/* 5. 자유 게시판 */}
         {activeTab === 'board' && (
           <section className="tab-content text-left">
             <div className="board-top-header">
@@ -1370,7 +1368,6 @@ export default function App() {
                     <div className="post-header">
                       <div className="post-header-main">
                         <h3 className="post-title">{post.title}</h3>
-                        {/* 작성자 이름을 아이디(authorId)로 표시 */}
                         <span className="post-date">{post.authorId} · {post.createdAt}</span>
                       </div>
                       {canDelete && (
@@ -1413,7 +1410,6 @@ export default function App() {
                           <div key={c.id} className="comment-item">
                             <div className="comment-main-info">
                               <div className="comment-header-row">
-                                {/* 댓글 작성자 이름을 아이디(authorId)로 표시 */}
                                 <span className="comment-author">{c.authorId}</span>
                                 <span className="comment-date">{c.createdAt}</span>
                               </div>
@@ -1433,7 +1429,7 @@ export default function App() {
           </section>
         )}
 
-        {/* 6. 개인/자녀 QR코드 및 출석/공지사항 보기 */}
+        {/* 6. 개인/자녀 QR코드 */}
         {activeTab === 'qr' && currentUser?.role === 'USER' && currentUser.category !== 'GENERAL' && (
           <section className="tab-content text-center">
             {(() => {
@@ -1459,10 +1455,8 @@ export default function App() {
                     </h3>
                   </div>
 
-                  {/* QR 코드 밑 개인별/부별/전체 공지 (부모 관람 시 부모 개인공지만 혹은 부별/전체만 반영) */}
                   {renderUserNotices(targetUser, isParentView)}
 
-                  {/* 출석 요약 카드 */}
                   {(() => {
                     const myStats = attendanceAnalytics.studentStats.find(s => s.userId === targetUser.id)
                     return (
@@ -1531,7 +1525,7 @@ export default function App() {
           </section>
         )}
 
-        {/* 7. 관리자 전용 QR 스캐너 */}
+        {/* 7. 관리자 QR 스캐너 */}
         {activeTab === 'qr' && currentUser?.role === 'ADMIN' && adminMode === 'EDIT' && (
           <section className="tab-content text-center">
             <h2>📷 출석 체크 QR 스캐너</h2>
@@ -1544,12 +1538,11 @@ export default function App() {
           </section>
         )}
 
-        {/* 8. 출석 및 회원 관리 + 공지사항 관리 (관리자) */}
+        {/* 8. 관리자 통계 및 출석 현황 */}
         {activeTab === 'attendance' && currentUser?.role === 'ADMIN' && (
           <section className="tab-content text-left">
             <h2>📢 회원 QR 바코드 밑 공지사항 작성</h2>
             <div className="notice-management-box">
-              {/* 1) 전체 공지 */}
               <div className="notice-editor-card">
                 <h4>🌐 전체 공지 (모든 회원 QR 밑에 표시)</h4>
                 <div className="input-group">
@@ -1563,7 +1556,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 2) 부별 공지 */}
               <div className="notice-editor-card">
                 <h4>📢 부별 공지 (해당 부서 회원 QR 밑에 표시)</h4>
                 <div className="input-group">
@@ -1586,7 +1578,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 3) 개인별 공지 (학부모 포함 전체 회원 대상 가능) */}
               <div className="notice-editor-card">
                 <h4>💌 개인별 공지 (해당 회원/자녀/학부모 QR 밑에 표시)</h4>
                 <div className="input-group">
@@ -1620,7 +1611,6 @@ export default function App() {
             </div>
 
             <h2>📊 학원 관리 및 출석 통계 리포트</h2>
-            {/* 회원수 현황 (원생 수 구분 추가) */}
             <div className="count-grid">
               {(Object.keys(CATEGORY_LABELS) as UserCategory[]).map(catKey => {
                 const count = users.filter(u => u.role !== 'ADMIN' && u.category === catKey).length
@@ -1643,7 +1633,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* 학원 관리 그래프 섹션 */}
             <div className="analytics-section">
               <h3>📈 출석 분석 그래프</h3>
 
@@ -1687,7 +1676,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* 원생 정보, 수동 등하원 체크 & 회원 강제 탈퇴 */}
             <h2>📋 원생 수동 등하원 체크 및 전체 회원 관리</h2>
             <div className="table-responsive mb-24">
               <table className="attendance-table">
@@ -1747,7 +1735,6 @@ export default function App() {
               </table>
             </div>
 
-            {/* 등/하원 상세 기록 */}
             <h2>⏱️ 주/월/분기/연도별 등원 상세 기록</h2>
             <div className="filter-bar">
               <select value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)} className="select-filter">
