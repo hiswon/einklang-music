@@ -134,7 +134,7 @@ function getQuarter(date: Date): number {
 function getDayOfWeekName(dateStr: string): string {
   const days = ['일', '월', '화', '수', '목', '금', '토']
   const d = new Date(dateStr)
-  return days[d.getDay()] || ''
+  return days[d.getDay()]
 }
 
 export default function App() {
@@ -176,7 +176,7 @@ export default function App() {
   const [regChildName, setRegChildName] = useState('')
   const [regChildFood, setRegChildFood] = useState('')
 
-  // 회원 정보 수정 폼 입력값 (아이디 수정 지원)
+  // 회원 정보 수정 폼 입력값
   const [editId, setEditId] = useState('')
   const [editName, setEditName] = useState('')
   const [editFood, setEditFood] = useState('')
@@ -346,75 +346,90 @@ export default function App() {
     alert(regCategory === 'PARENT' ? `학부모 가입이 완료되었습니다! (자녀: ${regChildName})` : '회원가입이 완료되었습니다!')
   }
 
-  // 회원 정보 수정 (아이디 변경 지원 & 관련 연동 데이터 업데이트)
+  // 회원 정보 수정 (아이디 변경 포함)
   const handleEditProfile = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!currentUser) return
 
-    const newId = editId.trim()
-    const newName = editName.trim()
-    const newReason = editFood.trim()
+    const newIdTrimmed = editId.trim()
     const oldId = currentUser.id
 
-    if (!newId) {
+    if (!newIdTrimmed) {
       alert('아이디를 입력해 주세요.')
       return
     }
 
-    // 아이디 변경 시 중복 검사
-    if (newId !== oldId && users.some(u => u.id === newId)) {
-      alert('이미 사용 중인 아이디입니다. 다른 아이디를 선택하세요.')
+    if (newIdTrimmed !== oldId && users.some(u => u.id === newIdTrimmed)) {
+      alert('이미 사용중인 아이디입니다.')
       return
     }
 
-    // 사용자 목록 업데이트 (학부모 연동 자녀 ID 변경 포함)
+    const updatedName = editName.trim() || currentUser.name
+    const updatedFood = editFood.trim() || currentUser.reason
+    const updatedPw = editNewPw.trim() ? editNewPw.trim() : currentUser.password
+
+    // 1. 유저 목록 업데이트 및 자녀 연동(childId) 갱신
     const updatedUsers = users.map(u => {
       if (u.id === oldId) {
         return {
           ...u,
-          id: newId,
-          name: newName || u.name,
-          reason: newReason || u.reason,
-          password: editNewPw.trim() ? editNewPw.trim() : u.password
+          id: newIdTrimmed,
+          name: updatedName,
+          reason: updatedFood,
+          password: updatedPw
         }
       }
       if (u.childId === oldId) {
-        return {
-          ...u,
-          childId: newId,
-          childName: newName || u.childName
-        }
+        return { ...u, childId: newIdTrimmed }
       }
       return u
     })
 
-    // 게시글 내 작성자 정보 업데이트
-    const updatedPosts = posts.map(p => {
-      if (p.authorId === oldId) {
-        return { ...p, authorId: newId, authorName: newName || p.authorName }
-      }
-      return p
-    })
-
-    // 출석 기록 연동 업데이트
+    // 2. 출석 기록 내 userId/userName 변경 반영
     const updatedAttendances = attendances.map(a => {
       if (a.userId === oldId) {
-        return { ...a, userId: newId, userName: newName || a.userName }
+        return { ...a, userId: newIdTrimmed, userName: updatedName }
       }
       return a
     })
 
-    // 개인 공지 연동 키 업데이트
-    const updatedNotices = { ...notices }
-    if (oldId !== newId && updatedNotices.personalNotices[oldId]) {
-      updatedNotices.personalNotices[newId] = updatedNotices.personalNotices[oldId]
-      delete updatedNotices.personalNotices[oldId]
-    }
+    // 3. 게시글 작성자 정보 업데이트
+    const updatedPosts = posts.map(p => {
+      let changed = false
+      let authorId = p.authorId
+      let authorName = p.authorName
 
-    const updatedUser = updatedUsers.find(u => u.id === newId) || currentUser
+      if (p.authorId === oldId) {
+        authorId = newIdTrimmed
+        authorName = updatedName
+        changed = true
+      }
+
+      const updatedLikedUsers = p.likedUsers?.map(id => (id === oldId ? newIdTrimmed : id)) || []
+
+      if (changed || p.likedUsers?.includes(oldId)) {
+        return {
+          ...p,
+          authorId,
+          authorName,
+          likedUsers: updatedLikedUsers
+        }
+      }
+      return p
+    })
+
+    // 4. 개인 공지 키(userId) 업데이트
+    const updatedPersonalNotices = { ...notices.personalNotices }
+    if (oldId !== newIdTrimmed && updatedPersonalNotices[oldId]) {
+      updatedPersonalNotices[newIdTrimmed] = updatedPersonalNotices[oldId]
+      delete updatedPersonalNotices[oldId]
+    }
+    const updatedNotices = { ...notices, personalNotices: updatedPersonalNotices }
+
+    const updatedUser = updatedUsers.find(u => u.id === newIdTrimmed) || currentUser
     setUsers(updatedUsers)
-    setPosts(updatedPosts)
     setAttendances(updatedAttendances)
+    setPosts(updatedPosts)
     setNotices(updatedNotices)
     setCurrentUser(updatedUser)
     setShowAuthModal(false)
@@ -580,7 +595,7 @@ export default function App() {
     }
     setNotices(updated)
     await saveDataToFirebase(academyData, posts, users, attendances, updated)
-    alert(`${CATEGORY_LABELS[cat]} 부별 공지사항이 업데이트 되었습니다.`)
+    alert(`${CATEGORY_LABELS[cat]} 부별 공지가 업데이트 되었습니다.`)
   }
 
   const handleSavePersonalNotice = async (targetId: string, noticeStr: string) => {
@@ -959,31 +974,34 @@ export default function App() {
     )
   }
 
-  // 로그인 사용자/학부모 관점 공지사항 출력 렌더러
-  const renderUserNotices = (targetUser: User, isParent: boolean) => {
+  // 현재 로그인 사용자/자녀의 QR코드 밑 공지 표시 (요청사항 2 반영)
+  const renderUserNotices = (targetUser: User) => {
     const activeNotices: { type: string; text: string }[] = []
+    const isLoggedParent = currentUser?.category === 'PARENT'
 
-    // 1. 전체 공지
+    // 1. 전체 공지 (학부모 및 학생 모두 표시)
     if (notices.globalNotice?.trim()) {
       activeNotices.push({ type: '🌐 전체 공지', text: notices.globalNotice })
     }
 
-    // 2. 부별 공지 (원생의 소속 부서 공지)
-    if (notices.categoryNotices[targetUser.category]?.trim()) {
+    // 2. 부별 공지 (학부모의 경우 연동된 자녀의 부서 공지 표시)
+    const targetCategory = targetUser.category
+    if (notices.categoryNotices[targetCategory]?.trim()) {
       activeNotices.push({
-        type: `📢 ${CATEGORY_LABELS[targetUser.category]} 공지`,
-        text: notices.categoryNotices[targetUser.category]!
+        type: `📢 ${CATEGORY_LABELS[targetCategory]} 공지`,
+        text: notices.categoryNotices[targetCategory]!
       })
     }
 
-    // 3. 개인 맞춤 공지 (학부모에게는 미공지, 개인에게만 공지)
-    if (!isParent && notices.personalNotices[targetUser.id]?.trim()) {
-      activeNotices.push({ type: '💌 개인 맞춤 공지', text: notices.personalNotices[targetUser.id]! })
-    }
-
-    // 4. 학부모 계정 본인에게 설정된 개인 공지
-    if (isParent && currentUser && notices.personalNotices[currentUser.id]?.trim()) {
-      activeNotices.push({ type: '💌 학부모 전용 맞춤 공지', text: notices.personalNotices[currentUser.id]! })
+    // 3. 개인 맞춤 공지 (학부모 모드일 때는 학생의 개인공지 제외, 학부모 계정 본인 공지만 표시)
+    if (isLoggedParent) {
+      if (notices.personalNotices[currentUser.id]?.trim()) {
+        activeNotices.push({ type: '💌 학부모 개인 공지', text: notices.personalNotices[currentUser.id]! })
+      }
+    } else {
+      if (notices.personalNotices[targetUser.id]?.trim()) {
+        activeNotices.push({ type: '💌 개인 맞춤 공지', text: notices.personalNotices[targetUser.id]! })
+      }
     }
 
     if (activeNotices.length === 0) return null
@@ -1184,6 +1202,7 @@ export default function App() {
               </form>
             )}
 
+            {/* 요청사항 1 반영: 아이디 수정 필드 추가 */}
             {authMode === 'EDIT_PROFILE' && (
               <form onSubmit={handleEditProfile}>
                 <label className="input-label">아이디</label>
@@ -1427,23 +1446,37 @@ export default function App() {
           </section>
         )}
 
-        {/* 6. 개인/자녀 QR코드 및 출석/공지사항 보기 */}
+        {/* 6. 개인/자녀 QR코드 및 출석/공지사항 보기 (요청사항 4 반영) */}
         {activeTab === 'qr' && currentUser?.role === 'USER' && currentUser.category !== 'GENERAL' && (
           <section className="tab-content text-center">
             {(() => {
-              const isParentView = currentUser.category === 'PARENT'
               // 학부모인 경우 자녀의 프로필을 타겟으로 함
-              const targetUser = isParentView && currentUser.childId
+              const targetUser = currentUser.category === 'PARENT' && currentUser.childId
                 ? users.find(u => u.id === currentUser.childId) || currentUser
                 : currentUser
 
-              // 최근 7일 출석 목록 필터링
-              const nowMs = new Date().getTime()
-              const sevenDaysMs = 7 * 24 * 60 * 60 * 1000
-              const recent7DaysAttendances = attendances.filter(a => {
-                if (a.userId !== targetUser.id) return false
-                const recDateMs = new Date(a.date).getTime()
-                return nowMs - recDateMs <= sevenDaysMs
+              const isParentView = currentUser.category === 'PARENT'
+
+              // 오늘 기준 날짜 계산
+              const today = new Date()
+              today.setHours(0, 0, 0, 0)
+
+              const userAttendances = attendances.filter(a => a.userId === targetUser.id)
+
+              // 7일 이내 및 7일 이전 출석 기록 분리
+              const recent7DaysList: AttendanceRecord[] = []
+              const olderList: AttendanceRecord[] = []
+
+              userAttendances.forEach(a => {
+                const aDate = new Date(a.date)
+                aDate.setHours(0, 0, 0, 0)
+                const diffDays = Math.floor((today.getTime() - aDate.getTime()) / (1000 * 60 * 60 * 24))
+
+                if (diffDays >= 0 && diffDays <= 7) {
+                  recent7DaysList.push(a)
+                } else {
+                  olderList.push(a)
+                }
               })
 
               return (
@@ -1461,8 +1494,8 @@ export default function App() {
                     </h3>
                   </div>
 
-                  {/* QR 코드 밑 공지사항 (개인 맞춤 공지 - 본인 전용 / 부별,전체 - 학부모 포함) */}
-                  {renderUserNotices(targetUser, isParentView)}
+                  {/* QR 코드 밑 개인별/부별/전체 공지 표시 */}
+                  {renderUserNotices(targetUser)}
 
                   {/* 출석 요약 카드 */}
                   {(() => {
@@ -1485,37 +1518,50 @@ export default function App() {
                     )
                   })()}
 
+                  {/* 요청사항 4: 최근 7일간 등하원 시간표 */}
                   <div className="my-attendance-box">
-                    <h3>📅 {isParentView ? `[${targetUser.name}] 자녀 등하원 시간표 (최근 7일)` : '내 최근 등하원 시간표 (최근 7일)'}</h3>
+                    <h3>⏱️ 최근 7일간 등하원 상세 시간표</h3>
                     <table className="attendance-table">
                       <thead>
                         <tr>
-                          <th>날짜 (요일)</th>
-                          <th>주차</th>
+                          <th>날짜</th>
+                          <th>요일</th>
                           <th>등원 시간</th>
                           <th>하원 시간</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {recent7DaysAttendances.length === 0 ? (
-                          <tr><td colSpan={4}>최근 7일간 출석 기록이 없습니다.</td></tr>
+                        {recent7DaysList.length === 0 ? (
+                          <tr><td colSpan={4}>최근 7일간의 출석 기록이 없습니다.</td></tr>
                         ) : (
-                          recent7DaysAttendances.map(a => {
-                            const d = new Date(a.date)
-                            const dayName = getDayOfWeekName(a.date)
-                            return (
-                              <tr key={a.id}>
-                                <td>{a.date} ({dayName})</td>
-                                <td>{getWeekNumber(d)}주차</td>
-                                <td><span className="badge-in">{a.checkIn}</span></td>
-                                <td>{a.checkOut ? <span className="badge-out">{a.checkOut}</span> : <span className="badge-pending">수업 중</span>}</td>
-                              </tr>
-                            )
-                          })
+                          recent7DaysList.map(a => (
+                            <tr key={a.id}>
+                              <td>{a.date}</td>
+                              <td>{getDayOfWeekName(a.date)}요일</td>
+                              <td><span className="badge-in">{a.checkIn}</span></td>
+                              <td>{a.checkOut ? <span className="badge-out">{a.checkOut}</span> : <span className="badge-pending">수업 중</span>}</td>
+                            </tr>
+                          ))
                         )}
                       </tbody>
                     </table>
                   </div>
+
+                  {/* 요청사항 4: 7일 이전 출석 히스토리 (날짜/요일 체크만) */}
+                  {olderList.length > 0 && (
+                    <div className="my-attendance-box mb-24">
+                      <h3>📅 이전 출석 기록 (날짜 및 요일)</h3>
+                      <div className="attendance-check-grid">
+                        {olderList.map(a => (
+                          <div key={a.id} className="attendance-check-chip">
+                            <span className="check-icon">✅</span>
+                            <span className="check-date">{a.date}</span>
+                            <span className="check-day">({getDayOfWeekName(a.date)})</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </>
               )
             })()}
@@ -1556,7 +1602,7 @@ export default function App() {
 
               {/* 2) 부별 공지 */}
               <div className="notice-editor-card">
-                <h4>📢 부별 공지 (해당 부서 회원 및 학부모 QR 밑에 표시)</h4>
+                <h4>📢 부별 공지 (해당 부서 회원 QR 밑에 표시)</h4>
                 <div className="input-group">
                   <select value={noticeCategory} onChange={e => {
                     const cat = e.target.value as UserCategory
@@ -1577,9 +1623,9 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 3) 개인별 공지 */}
+              {/* 3) 개인별 공지 (요청사항 2: 학부모도 수신 선택 가능) */}
               <div className="notice-editor-card">
-                <h4>💌 개인별 공지 (원생 및 학부모 포함 개인별 개별 공지)</h4>
+                <h4>💌 개인별 공지 (해당 원생 또는 학부모 QR 밑에 표시)</h4>
                 <div className="input-group">
                   <select value={noticeTargetUserId} onChange={e => {
                     const id = e.target.value
@@ -1589,7 +1635,7 @@ export default function App() {
                     <option value="">-- 회원 선택 --</option>
                     {users.filter(u => u.role !== 'ADMIN').map(u => (
                       <option key={u.id} value={u.id}>
-                        {u.name} ({CATEGORY_LABELS[u.category]})
+                        {u.name} ({CATEGORY_LABELS[u.category]}){u.childName ? ` [자녀: ${u.childName}]` : ''}
                       </option>
                     ))}
                   </select>
@@ -1611,7 +1657,7 @@ export default function App() {
             </div>
 
             <h2>📊 학원 관리 및 출석 통계 리포트</h2>
-            {/* 회원수 현황 */}
+            {/* 회원수 현황 (요청사항 3: 원생 수 표시 추가) */}
             <div className="count-grid">
               {(Object.keys(CATEGORY_LABELS) as UserCategory[]).map(catKey => {
                 const count = users.filter(u => u.role !== 'ADMIN' && u.category === catKey).length
@@ -1622,9 +1668,8 @@ export default function App() {
                   </div>
                 )
               })}
-              {/* 일반 및 학부모 제외 학생 원생 수 */}
               <div className="count-card student-total">
-                <span className="cat-title">🎓 원생 수</span>
+                <span className="cat-title">🎓 원생 수 (일반/학부모 제외)</span>
                 <span className="cat-count">
                   {users.filter(u => u.role !== 'ADMIN' && u.category !== 'GENERAL' && u.category !== 'PARENT').length}명
                 </span>
@@ -1770,12 +1815,12 @@ export default function App() {
               <table className="attendance-table">
                 <thead>
                   <tr>
-                    <th>날짜 (요일)</th>
+                    <th>날짜</th>
                     <th>주차</th>
                     <th>분류</th>
                     <th>이름 (ID)</th>
-                    <th>등원 시간</th>
-                    <th>하원 시간</th>
+                    <th>등원 시간 (시:분)</th>
+                    <th>하원 시간 (시:분)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1784,10 +1829,9 @@ export default function App() {
                   ) : (
                     getFilteredAttendances().map(a => {
                       const d = new Date(a.date)
-                      const dayName = getDayOfWeekName(a.date)
                       return (
                         <tr key={a.id}>
-                          <td>{a.date} ({dayName})</td>
+                          <td>{a.date}</td>
                           <td>{getWeekNumber(d)}주차</td>
                           <td>{CATEGORY_LABELS[a.userCategory]}</td>
                           <td>{a.userName} ({a.userId})</td>
