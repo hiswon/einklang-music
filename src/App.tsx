@@ -171,6 +171,7 @@ export default function App() {
   const [regChildFood, setRegChildFood] = useState('')
 
   // 회원 정보 수정 폼 입력값
+  const [editId, setEditId] = useState('')
   const [editName, setEditName] = useState('')
   const [editFood, setEditFood] = useState('')
   const [editNewPw, setEditNewPw] = useState('')
@@ -285,7 +286,7 @@ export default function App() {
       alert('모든 필수 필드를 입력해 주세요.')
       return
     }
-    if (users.some(u => u.id === regId)) {
+    if (users.some(u => u.id === regId.trim())) {
       alert('이미 존재하는 아이디입니다.')
       return
     }
@@ -339,31 +340,76 @@ export default function App() {
     alert(regCategory === 'PARENT' ? `학부모 가입이 완료되었습니다! (자녀: ${regChildName})` : '회원가입이 완료되었습니다!')
   }
 
-  // 회원 정보 수정 (비밀번호 포함)
+  // 회원 정보 수정 (아이디 수정 포함)
   const handleEditProfile = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!currentUser) return
 
+    const trimmedNewId = editId.trim()
+    const trimmedName = editName.trim()
+    const trimmedFood = editFood.trim()
+    const trimmedNewPw = editNewPw.trim()
+
+    if (!trimmedNewId || !trimmedName || !trimmedFood) {
+      alert('아이디, 이름, 좋아하는 음식은 필수 입력사항입니다.')
+      return
+    }
+
+    // 아이디가 변경된 경우 중복 체크
+    if (trimmedNewId !== currentUser.id) {
+      if (users.some(u => u.id === trimmedNewId)) {
+        alert('이미 사용 중인 아이디입니다. 다른 아이디를 입력해주세요.')
+        return
+      }
+    }
+
+    const oldUserId = currentUser.id
+
+    // 사용자 정보 업데이트
     const updatedUsers = users.map(u => {
-      if (u.id === currentUser.id) {
+      if (u.id === oldUserId) {
         return {
           ...u,
-          name: editName.trim() || u.name,
-          reason: editFood.trim() || u.reason,
-          password: editNewPw.trim() ? editNewPw.trim() : u.password
+          id: trimmedNewId,
+          name: trimmedName,
+          reason: trimmedFood,
+          password: trimmedNewPw ? trimmedNewPw : u.password
         }
+      }
+      // 학부모 유저가 자녀 ID로 연결된 경우 연동 업데이트
+      if (u.category === 'PARENT' && u.childId === oldUserId) {
+        return { ...u, childId: trimmedNewId }
       }
       return u
     })
 
-    const updatedUser = updatedUsers.find(u => u.id === currentUser.id) || currentUser
+    // 아이디 변경 시 출석 데이터 ID 연동 업데이트
+    const updatedAttendances = attendances.map(a => {
+      if (a.userId === oldUserId) {
+        return { ...a, userId: trimmedNewId, userName: trimmedName }
+      }
+      return a
+    })
+
+    // 아이디 변경 시 개인 공지사항 key 연동 업데이트
+    const updatedPersonalNotices = { ...notices.personalNotices }
+    if (oldUserId !== trimmedNewId && updatedPersonalNotices[oldUserId]) {
+      updatedPersonalNotices[trimmedNewId] = updatedPersonalNotices[oldUserId]
+      delete updatedPersonalNotices[oldUserId]
+    }
+    const updatedNotices = { ...notices, personalNotices: updatedPersonalNotices }
+
+    const updatedUser = updatedUsers.find(u => u.id === trimmedNewId) || currentUser
+
     setUsers(updatedUsers)
+    setAttendances(updatedAttendances)
+    setNotices(updatedNotices)
     setCurrentUser(updatedUser)
     setShowAuthModal(false)
     setEditNewPw('')
 
-    await saveDataToFirebase(academyData, posts, updatedUsers, attendances, notices)
-    alert('회원 정보가 성공적으로 수정되었습니다!')
+    await saveDataToFirebase(academyData, posts, updatedUsers, updatedAttendances, updatedNotices)
+    alert('회원 정보(아이디 포함)가 성공적으로 수정되었습니다!')
   }
 
   // 탈퇴 처리
@@ -899,22 +945,29 @@ export default function App() {
   }
 
   // 현재 사용자/자녀의 QR코드 밑에 표시할 공지 목록 생성 렌더러
-  const renderUserNotices = (targetUser: User) => {
+  // 요구사항 2 반영: 개인맞춤공지는 원생 본인에게만 공지(학부모 제외), 부모공지는 학부모 계정 본인에게만 공지(자녀 제외)
+  const renderUserNotices = (targetUser: User, loggedInUser: User) => {
     const activeNotices: { type: string; text: string }[] = []
 
+    // 1) 전체 공지
     if (notices.globalNotice?.trim()) {
       activeNotices.push({ type: '🌐 전체 공지', text: notices.globalNotice })
     }
 
+    // 2) 부별 공지 (학부모 공지는 학부모 본인이 로그인 시에만 노출)
     if (notices.categoryNotices[targetUser.category]?.trim()) {
-      activeNotices.push({
-        type: `📢 ${CATEGORY_LABELS[targetUser.category]} 공지`,
-        text: notices.categoryNotices[targetUser.category]!
-      })
+      const isParentCategory = targetUser.category === 'PARENT'
+      if (!isParentCategory || loggedInUser.category === 'PARENT') {
+        activeNotices.push({
+          type: `📢 ${CATEGORY_LABELS[targetUser.category]} 공지`,
+          text: notices.categoryNotices[targetUser.category]!
+        })
+      }
     }
 
-    if (notices.personalNotices[targetUser.id]?.trim()) {
-      activeNotices.push({ type: '💌 개인 맞춤 공지', text: notices.personalNotices[targetUser.id]! })
+    // 3) 개인 맞춤 공지 (자녀/원생 본인이 로그인한 경우에만 노출되고 학부모 조회 화면엔 노출 안 됨)
+    if (loggedInUser.category !== 'PARENT' && notices.personalNotices[loggedInUser.id]?.trim()) {
+      activeNotices.push({ type: '💌 개인 맞춤 공지', text: notices.personalNotices[loggedInUser.id]! })
     }
 
     if (activeNotices.length === 0) return null
@@ -995,6 +1048,7 @@ export default function App() {
               <button
                 className="admin-btn edit-profile-btn"
                 onClick={() => {
+                  setEditId(currentUser.id)
                   setEditName(currentUser.name)
                   setEditFood(currentUser.reason)
                   setEditNewPw('')
@@ -1114,8 +1168,12 @@ export default function App() {
               </form>
             )}
 
+            {/* 회원 정보 수정 모달 (아이디 수정 기능 추가) */}
             {authMode === 'EDIT_PROFILE' && (
               <form onSubmit={handleEditProfile}>
+                <label className="input-label">아이디</label>
+                <input type="text" value={editId} onChange={e => setEditId(e.target.value)} required />
+
                 <label className="input-label">이름</label>
                 <input type="text" value={editName} onChange={e => setEditName(e.target.value)} required />
 
@@ -1380,8 +1438,8 @@ export default function App() {
                     </h3>
                   </div>
 
-                  {/* QR 코드 밑 개인별/부별/전체 공지 표시 */}
-                  {renderUserNotices(targetUser)}
+                  {/* QR 코드 밑 공지 표시 (개인맞춤/부모공지 노출 분리 적용) */}
+                  {renderUserNotices(targetUser, currentUser)}
 
                   {/* 출석 요약 카드 */}
                   {(() => {
