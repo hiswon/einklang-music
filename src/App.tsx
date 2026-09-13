@@ -920,7 +920,7 @@ export default function App() {
                   </select>
                 </label>
 
-                <textarea placeholder="당신은 무엇을 좋아하나요?(사람,물건,음식..등.)" value={regReason} onChange={e => setRegReason(e.target.value)} className="modal-textarea" required />
+                <textarea placeholder="당신이 좋아하는 음식은 무엇입니까?" value={regReason} onChange={e => setRegReason(e.target.value)} className="modal-textarea" required />
                 <div className="modal-buttons">
                   <button type="submit" className="btn-confirm">가입 완료</button>
                   <button type="button" className="btn-cancel" onClick={() => setShowAuthModal(false)}>취소</button>
@@ -1349,7 +1349,7 @@ export default function App() {
                     <th>아이디</th>
                     <th>이름</th>
                     <th>분류</th>
-                    <th>좋아하는 것</th>
+                    <th>좋아하는 음식</th>
                     <th>관리</th>
                   </tr>
                 </thead>
