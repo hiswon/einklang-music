@@ -170,7 +170,7 @@ export default function App() {
   const [regChildName, setRegChildName] = useState('')
   const [regChildFood, setRegChildFood] = useState('')
 
-  // 회원 정보 수정 폼 입력값
+  // 회원 정보 수정 폼 입력값 (아이디 포함)
   const [editId, setEditId] = useState('')
   const [editName, setEditName] = useState('')
   const [editFood, setEditFood] = useState('')
@@ -279,28 +279,26 @@ export default function App() {
     }
   }
 
-  // 회원가입 (학부모 검증 포함)
+  // 회원가입
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!regId || !regPw || !regName || !regReason) {
       alert('모든 필수 필드를 입력해 주세요.')
       return
     }
-    if (users.some(u => u.id === regId.trim())) {
+    if (users.some(u => u.id === regId)) {
       alert('이미 존재하는 아이디입니다.')
       return
     }
 
     let targetChildId: string | undefined = undefined
 
-    // 학부모 가입 시 자녀 정보 검증
     if (regCategory === 'PARENT') {
       if (!regChildName || !regChildFood) {
         alert('자녀 이름과 자녀가 좋아하는 음식을 적어주세요.')
         return
       }
 
-      // 기존 가입된 학생 중 이름과 좋아하는 음식이 동일한 원생 검색
       const foundChild = users.find(
         u => u.role !== 'ADMIN' &&
              u.category !== 'GENERAL' &&
@@ -340,76 +338,91 @@ export default function App() {
     alert(regCategory === 'PARENT' ? `학부모 가입이 완료되었습니다! (자녀: ${regChildName})` : '회원가입이 완료되었습니다!')
   }
 
-  // 회원 정보 수정 (아이디 수정 포함)
+  // 회원 정보 수정 (아이디 변경 포함)
   const handleEditProfile = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!currentUser) return
 
-    const trimmedNewId = editId.trim()
-    const trimmedName = editName.trim()
-    const trimmedFood = editFood.trim()
-    const trimmedNewPw = editNewPw.trim()
+    const newId = editId.trim()
+    const oldId = currentUser.id
 
-    if (!trimmedNewId || !trimmedName || !trimmedFood) {
-      alert('아이디, 이름, 좋아하는 음식은 필수 입력사항입니다.')
+    if (!newId) {
+      alert('아이디를 입력해 주세요.')
       return
     }
 
-    // 아이디가 변경된 경우 중복 체크
-    if (trimmedNewId !== currentUser.id) {
-      if (users.some(u => u.id === trimmedNewId)) {
-        alert('이미 사용 중인 아이디입니다. 다른 아이디를 입력해주세요.')
-        return
-      }
+    // 아이디를 변경한 경우 중복 확인
+    if (newId !== oldId && users.some(u => u.id === newId)) {
+      alert('이미 존재하는 아이디입니다. 다른 아이디를 입력해 주세요.')
+      return
     }
 
-    const oldUserId = currentUser.id
-
-    // 사용자 정보 업데이트
+    // 1. 회원 정보 연동 업데이트
     const updatedUsers = users.map(u => {
-      if (u.id === oldUserId) {
+      if (u.id === oldId) {
         return {
           ...u,
-          id: trimmedNewId,
-          name: trimmedName,
-          reason: trimmedFood,
-          password: trimmedNewPw ? trimmedNewPw : u.password
+          id: newId,
+          name: editName.trim() || u.name,
+          reason: editFood.trim() || u.reason,
+          password: editNewPw.trim() ? editNewPw.trim() : u.password
         }
       }
-      // 학부모 유저가 자녀 ID로 연결된 경우 연동 업데이트
-      if (u.category === 'PARENT' && u.childId === oldUserId) {
-        return { ...u, childId: trimmedNewId }
+      // 다른 학부모 계정이 이 유저를 자녀로 가지고 있을 경우 childId 업데이트
+      if (u.childId === oldId) {
+        return { ...u, childId: newId }
       }
       return u
     })
 
-    // 아이디 변경 시 출석 데이터 ID 연동 업데이트
+    // 2. 출석 기록 ID 업데이트
     const updatedAttendances = attendances.map(a => {
-      if (a.userId === oldUserId) {
-        return { ...a, userId: trimmedNewId, userName: trimmedName }
+      if (a.userId === oldId) {
+        return {
+          ...a,
+          userId: newId,
+          userName: editName.trim() || a.userName
+        }
       }
       return a
     })
 
-    // 아이디 변경 시 개인 공지사항 key 연동 업데이트
-    const updatedPersonalNotices = { ...notices.personalNotices }
-    if (oldUserId !== trimmedNewId && updatedPersonalNotices[oldUserId]) {
-      updatedPersonalNotices[trimmedNewId] = updatedPersonalNotices[oldUserId]
-      delete updatedPersonalNotices[oldUserId]
-    }
-    const updatedNotices = { ...notices, personalNotices: updatedPersonalNotices }
+    // 3. 게시판 게시글 작성자 ID 업데이트
+    const updatedPosts = posts.map(p => {
+      if (p.authorId === oldId) {
+        return {
+          ...p,
+          authorId: newId,
+          authorName: editName.trim() || p.authorName
+        }
+      }
+      return p
+    })
 
-    const updatedUser = updatedUsers.find(u => u.id === trimmedNewId) || currentUser
+    // 4. 개인 공지사항 ID 키 변경
+    const updatedNotices = { ...notices }
+    if (oldId !== newId && updatedNotices.personalNotices[oldId]) {
+      updatedNotices.personalNotices[newId] = updatedNotices.personalNotices[oldId]
+      delete updatedNotices.personalNotices[oldId]
+    }
+
+    const updatedUser = updatedUsers.find(u => u.id === newId) || {
+      ...currentUser,
+      id: newId,
+      name: editName.trim() || currentUser.name,
+      reason: editFood.trim() || currentUser.reason
+    }
 
     setUsers(updatedUsers)
     setAttendances(updatedAttendances)
+    setPosts(updatedPosts)
     setNotices(updatedNotices)
     setCurrentUser(updatedUser)
     setShowAuthModal(false)
     setEditNewPw('')
 
-    await saveDataToFirebase(academyData, posts, updatedUsers, updatedAttendances, updatedNotices)
-    alert('회원 정보(아이디 포함)가 성공적으로 수정되었습니다!')
+    await saveDataToFirebase(academyData, updatedPosts, updatedUsers, updatedAttendances, updatedNotices)
+    alert('회원 정보 및 아이디가 성공적으로 수정되었습니다!')
   }
 
   // 탈퇴 처리
@@ -558,6 +571,7 @@ export default function App() {
     const updated = { ...notices, globalNotice: noticeStr }
     setNotices(updated)
     await saveDataToFirebase(academyData, posts, users, attendances, updated)
+    alert('전체 공지가 업데이트 되었습니다!')
   }
 
   const handleSaveCategoryNotice = async (cat: UserCategory, noticeStr: string) => {
@@ -567,6 +581,7 @@ export default function App() {
     }
     setNotices(updated)
     await saveDataToFirebase(academyData, posts, users, attendances, updated)
+    alert(`${CATEGORY_LABELS[cat]} 공지가 업데이트 되었습니다!`)
   }
 
   const handleSavePersonalNotice = async (targetId: string, noticeStr: string) => {
@@ -576,6 +591,7 @@ export default function App() {
     }
     setNotices(updated)
     await saveDataToFirebase(academyData, posts, users, attendances, updated)
+    alert('개인 맞춤 공지가 업데이트 되었습니다!')
   }
 
   // 게시판 액션
@@ -944,30 +960,29 @@ export default function App() {
     )
   }
 
-  // 현재 사용자/자녀의 QR코드 밑에 표시할 공지 목록 생성 렌더러
-  // 요구사항 2 반영: 개인맞춤공지는 원생 본인에게만 공지(학부모 제외), 부모공지는 학부모 계정 본인에게만 공지(자녀 제외)
-  const renderUserNotices = (targetUser: User, loggedInUser: User) => {
+  // 로그인한 유저 및 학부모 조건에 맞춰 공지사항 출력 분기 처리
+  const renderUserNotices = (targetUser: User) => {
     const activeNotices: { type: string; text: string }[] = []
+    const isParent = currentUser?.category === 'PARENT'
 
-    // 1) 전체 공지
+    // 1. 전체 공지
     if (notices.globalNotice?.trim()) {
       activeNotices.push({ type: '🌐 전체 공지', text: notices.globalNotice })
     }
 
-    // 2) 부별 공지 (학부모 공지는 학부모 본인이 로그인 시에만 노출)
-    if (notices.categoryNotices[targetUser.category]?.trim()) {
-      const isParentCategory = targetUser.category === 'PARENT'
-      if (!isParentCategory || loggedInUser.category === 'PARENT') {
-        activeNotices.push({
-          type: `📢 ${CATEGORY_LABELS[targetUser.category]} 공지`,
-          text: notices.categoryNotices[targetUser.category]!
-        })
-      }
+    // 2. 부별 공지
+    // 학부모일 때는 'PARENT' 부별 공지 표시, 자녀/학생일 때는 학생 자신의 부별 공지 표시
+    const categoryKey = isParent ? 'PARENT' : targetUser.category
+    if (notices.categoryNotices[categoryKey]?.trim()) {
+      activeNotices.push({
+        type: `📢 ${CATEGORY_LABELS[categoryKey]} 공지`,
+        text: notices.categoryNotices[categoryKey]!
+      })
     }
 
-    // 3) 개인 맞춤 공지 (자녀/원생 본인이 로그인한 경우에만 노출되고 학부모 조회 화면엔 노출 안 됨)
-    if (loggedInUser.category !== 'PARENT' && notices.personalNotices[loggedInUser.id]?.trim()) {
-      activeNotices.push({ type: '💌 개인 맞춤 공지', text: notices.personalNotices[loggedInUser.id]! })
+    // 3. 개인 맞춤 공지 (학부모에겐 자녀의 개인 맞춤 공지가 노출되지 않음)
+    if (!isParent && notices.personalNotices[targetUser.id]?.trim()) {
+      activeNotices.push({ type: '💌 개인 맞춤 공지', text: notices.personalNotices[targetUser.id]! })
     }
 
     if (activeNotices.length === 0) return null
@@ -1168,7 +1183,6 @@ export default function App() {
               </form>
             )}
 
-            {/* 회원 정보 수정 모달 (아이디 수정 기능 추가) */}
             {authMode === 'EDIT_PROFILE' && (
               <form onSubmit={handleEditProfile}>
                 <label className="input-label">아이디</label>
@@ -1416,7 +1430,6 @@ export default function App() {
         {activeTab === 'qr' && currentUser?.role === 'USER' && currentUser.category !== 'GENERAL' && (
           <section className="tab-content text-center">
             {(() => {
-              // 학부모인 경우 자녀의 프로필을 타겟으로 함
               const targetUser = currentUser.category === 'PARENT' && currentUser.childId
                 ? users.find(u => u.id === currentUser.childId) || currentUser
                 : currentUser
@@ -1438,8 +1451,8 @@ export default function App() {
                     </h3>
                   </div>
 
-                  {/* QR 코드 밑 공지 표시 (개인맞춤/부모공지 노출 분리 적용) */}
-                  {renderUserNotices(targetUser, currentUser)}
+                  {/* QR 코드 밑 공지사항 영역 */}
+                  {renderUserNotices(targetUser)}
 
                   {/* 출석 요약 카드 */}
                   {(() => {
@@ -1555,7 +1568,7 @@ export default function App() {
 
               {/* 3) 개인별 공지 */}
               <div className="notice-editor-card">
-                <h4>💌 개인별 공지 (해당 회원/자녀 QR 밑에 표시)</h4>
+                <h4>💌 개인별 공지 (해당 원생 QR 밑에만 표시 / 부모 미표시)</h4>
                 <div className="input-group">
                   <select value={noticeTargetUserId} onChange={e => {
                     const id = e.target.value
@@ -1563,7 +1576,7 @@ export default function App() {
                     setInputPersonalNotice(notices.personalNotices[id] || '')
                   }}>
                     <option value="">-- 회원 선택 --</option>
-                    {users.filter(u => u.role !== 'ADMIN').map(u => (
+                    {users.filter(u => u.role !== 'ADMIN' && u.category !== 'PARENT').map(u => (
                       <option key={u.id} value={u.id}>
                         {u.name} ({CATEGORY_LABELS[u.category]})
                       </option>
