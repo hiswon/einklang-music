@@ -1264,7 +1264,7 @@ export default function App() {
                   rel="noreferrer"
                   className="map-link-btn"
                 >
-                  🗺️ Google 지도에서 위치 보기
+                  🗺️ Google 지도에서 보기
                 </a>
               </div>
 
