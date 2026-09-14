@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import './App.css'
 import { db } from './firebase'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
@@ -30,6 +30,14 @@ interface AcademyData {
   instructors: string
 }
 
+interface StudentNote {
+  id: string
+  date: string
+  content: string
+  authorId: string
+  createdAt: string
+}
+
 interface User {
   id: string
   password: string
@@ -39,6 +47,10 @@ interface User {
   role: 'ADMIN' | 'USER'
   childId?: string // 학부모일 경우 연동된 자녀의 ID
   childName?: string // 가입 시 입력한 자녀 이름
+  totalVisits?: number // 전체 접속 횟수
+  todayVisits?: number // 오늘 접속 횟수
+  lastVisitDate?: string // 마지막 접속 일자 (YYYY-MM-DD)
+  notes?: StudentNote[] // 학생 개별 기록
 }
 
 interface NoticeData {
@@ -78,7 +90,7 @@ interface Post {
   comments: Comment[]
 }
 
-type TabType = 'about' | 'courses' | 'schedule' | 'instructors' | 'board' | 'attendance' | 'qr'
+type TabType = 'about' | 'courses' | 'schedule' | 'instructors' | 'board' | 'classBoard' | 'attendance' | 'qr'
 type AdminMode = 'VIEW' | 'EDIT' | 'QR'
 
 const defaultSchedule = `3월 15일/ 버스킹 정기 라이브
@@ -91,8 +103,8 @@ const defaultSchedule = `3월 15일/ 버스킹 정기 라이브
 4월 05일/ 봄맞이 레코딩 세션`
 
 const ADMIN_ACCOUNTS: User[] = [
-  { id: 'jin', password: '12345', name: '관리자1(jin)', reason: '관리자 계정', category: 'GENERAL', role: 'ADMIN' },
-  { id: 'rang', password: '67890', name: '관리자2(rang)', reason: '관리자 계정', category: 'GENERAL', role: 'ADMIN' }
+  { id: 'jin', password: '12345', name: '진진', reason: '관리자 계정', category: 'GENERAL', role: 'ADMIN', totalVisits: 0, todayVisits: 0 },
+  { id: 'rang', password: '67890', name: '관리자2(rang)', reason: '관리자 계정', category: 'GENERAL', role: 'ADMIN', totalVisits: 0, todayVisits: 0 }
 ]
 
 function extractGoogleDriveId(url: string): string | null {
@@ -149,6 +161,7 @@ export default function App() {
     instructors: ''
   })
   const [posts, setPosts] = useState<Post[]>([])
+  const [classPosts, setClassPosts] = useState<Post[]>([]) // 수업 게시판 게시글
   const [users, setUsers] = useState<User[]>(ADMIN_ACCOUNTS)
   const [attendances, setAttendances] = useState<AttendanceRecord[]>([])
 
@@ -170,6 +183,7 @@ export default function App() {
   const [regReason, setRegReason] = useState('')
   const [regCategory, setRegCategory] = useState<UserCategory>('GENERAL')
 
+  const [regChildId, setRegChildId] = useState('')
   const [regChildName, setRegChildName] = useState('')
   const [regChildFood, setRegChildFood] = useState('')
 
@@ -182,10 +196,23 @@ export default function App() {
   const [delPw, setDelPw] = useState('')
 
   const [showWriteForm, setShowWriteForm] = useState<boolean>(false)
+  const [showClassWriteForm, setShowClassWriteForm] = useState<boolean>(false)
   const [newTitle, setNewTitle] = useState('')
   const [newContent, setNewContent] = useState('')
+  const [newClassTitle, setNewClassTitle] = useState('')
+  const [newClassContent, setNewClassContent] = useState('')
+
   const [playingPostId, setPlayingPostId] = useState<string | null>(null)
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({})
+
+  // 게시판 페이지네이션 상태
+  const [boardPage, setBoardPage] = useState<number>(1)
+  const [classBoardPage, setClassBoardPage] = useState<number>(1)
+  const ITEMS_PER_PAGE = 5
+
+  // 학생기록관리 상태
+  const [selectedStudentForNote, setSelectedStudentForNote] = useState<string>('')
+  const [newNoteContent, setNewNoteContent] = useState<string>('')
 
   const [editForm, setEditForm] = useState<AcademyData>(academyData)
   const [adminMode, setAdminMode] = useState<AdminMode>('VIEW')
@@ -206,6 +233,12 @@ export default function App() {
   const [scanMessage, setScanMessage] = useState<string>('')
   const [scanMessageType, setScanMessageType] = useState<'in' | 'out' | 'error' | ''>('')
 
+  // 마우스 드래그 스크롤을 위한 Ref 및 상태
+  const navRef = useRef<HTMLDivElement>(null)
+  const [isMouseDown, setIsMouseDown] = useState(false)
+  const [startX, setStartX] = useState(0)
+  const [scrollLeft, setScrollLeft] = useState(0)
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -222,6 +255,7 @@ export default function App() {
           setAcademyData(loadedData)
           setEditForm(loadedData)
           if (fetched.posts) setPosts(fetched.posts)
+          if (fetched.classPosts) setClassPosts(fetched.classPosts)
           if (fetched.users) {
             const merged = [...ADMIN_ACCOUNTS]
             fetched.users.forEach((u: User) => {
@@ -244,12 +278,14 @@ export default function App() {
     pList = posts,
     uList = users,
     aList = attendances,
-    nData = notices
+    nData = notices,
+    cList = classPosts
   ) => {
     try {
       await setDoc(doc(db, 'academy', 'data'), {
         ...data,
         posts: pList,
+        classPosts: cList,
         users: uList.filter(u => u.role !== 'ADMIN'),
         attendances: aList,
         notices: nData
@@ -259,16 +295,35 @@ export default function App() {
     }
   }
 
+  // 접속 수 업데이트 함수
+  const updateVisitCount = async (user: User) => {
+    const todayStr = new Date().toISOString().split('T')[0]
+    let isNewDay = user.lastVisitDate !== todayStr
+
+    const updatedUser: User = {
+      ...user,
+      totalVisits: (user.totalVisits || 0) + 1,
+      todayVisits: isNewDay ? 1 : (user.todayVisits || 0) + 1,
+      lastVisitDate: todayStr
+    }
+
+    const updatedUsers = users.map(u => (u.id === user.id ? updatedUser : u))
+    setUsers(updatedUsers)
+    setCurrentUser(updatedUser)
+
+    await saveDataToFirebase(academyData, posts, updatedUsers, attendances, notices, classPosts)
+  }
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
     const target = users.find(u => u.id === loginId && u.password === loginPw)
     if (target) {
-      setCurrentUser(target)
       setShowAuthModal(false)
       setLoginId('')
       setLoginPw('')
       if (target.role === 'ADMIN') setAdminMode('VIEW')
       alert(`${target.id}님 환영합니다!`)
+      updateVisitCount(target)
     } else {
       alert('아이디 또는 비밀번호가 올바르지 않습니다.')
     }
@@ -288,8 +343,8 @@ export default function App() {
     let targetChildId: string | undefined = undefined
 
     if (regCategory === 'PARENT') {
-      if (!regChildName || !regChildFood) {
-        alert('자녀 이름과 자녀가 좋아하는 음식을 적어주세요.')
+      if (!regChildId || !regChildName || !regChildFood) {
+        alert('자녀의 아이디, 이름, 좋아하는 음식을 모두 입력해 주세요.')
         return
       }
 
@@ -297,18 +352,20 @@ export default function App() {
         u => u.role !== 'ADMIN' &&
              u.category !== 'GENERAL' &&
              u.category !== 'PARENT' &&
+             u.id.trim() === regChildId.trim() &&
              u.name.trim() === regChildName.trim() &&
              u.reason.trim() === regChildFood.trim()
       )
 
       if (!foundChild) {
-        alert('입력하신 정보와 일치하는 자녀(원생)를 찾을 수 없습니다.\n자녀의 이름과 자녀가 가입 시 입력한 좋아하는 음식이 정확히 일치해야 합니다.')
+        alert('입력하신 자녀 정보(아이디, 이름, 좋아하는 음식)와 일치하는 원생 계정을 찾을 수 없습니다.')
         return
       }
 
       targetChildId = foundChild.id
     }
 
+    const todayStr = new Date().toISOString().split('T')[0]
     const newUser: User = {
       id: regId.trim(),
       password: regPw.trim(),
@@ -317,7 +374,11 @@ export default function App() {
       category: regCategory,
       role: 'USER',
       childId: targetChildId,
-      childName: regCategory === 'PARENT' ? regChildName.trim() : undefined
+      childName: regCategory === 'PARENT' ? regChildName.trim() : undefined,
+      totalVisits: 1,
+      todayVisits: 1,
+      lastVisitDate: todayStr,
+      notes: []
     }
 
     const updatedUsers = [...users, newUser]
@@ -326,9 +387,9 @@ export default function App() {
     setShowAuthModal(false)
 
     setRegId(''); setRegPw(''); setRegName(''); setRegReason('')
-    setRegChildName(''); setRegChildFood('')
+    setRegChildId(''); setRegChildName(''); setRegChildFood('')
 
-    await saveDataToFirebase(academyData, posts, updatedUsers, attendances, notices)
+    await saveDataToFirebase(academyData, posts, updatedUsers, attendances, notices, classPosts)
     alert(regCategory === 'PARENT' ? `학부모 가입이 완료되었습니다! (자녀: ${regChildName})` : '회원가입이 완료되었습니다!')
   }
 
@@ -365,47 +426,13 @@ export default function App() {
       return u
     })
 
-    const updatedAttendances = attendances.map(a => {
-      if (a.userId === oldId) {
-        return { ...a, userId: newId, userName: editName.trim() || a.userName }
-      }
-      return a
-    })
-
-    const updatedPosts = posts.map(p => {
-      let updatedP = { ...p }
-      if (p.authorId === oldId) {
-        updatedP.authorId = newId
-        updatedP.authorName = editName.trim() || p.authorName
-      }
-      if (p.comments) {
-        updatedP.comments = p.comments.map(c => {
-          if (c.authorId === oldId) {
-            return { ...c, authorId: newId, authorName: editName.trim() || c.authorName }
-          }
-          return c
-        })
-      }
-      return updatedP
-    })
-
-    const updatedNotices = { ...notices }
-    if (updatedNotices.personalNotices[oldId]) {
-      const noticeContent = updatedNotices.personalNotices[oldId]
-      delete updatedNotices.personalNotices[oldId]
-      updatedNotices.personalNotices[newId] = noticeContent
-    }
-
     const updatedUser = updatedUsers.find(u => u.id === newId) || currentUser
     setUsers(updatedUsers)
-    setAttendances(updatedAttendances)
-    setPosts(updatedPosts)
-    setNotices(updatedNotices)
     setCurrentUser(updatedUser)
     setShowAuthModal(false)
     setEditNewPw('')
 
-    await saveDataToFirebase(academyData, updatedPosts, updatedUsers, updatedAttendances, updatedNotices)
+    await saveDataToFirebase(academyData, posts, updatedUsers, attendances, notices, classPosts)
     alert('회원 정보 및 아이디가 성공적으로 수정되었습니다!')
   }
 
@@ -437,7 +464,43 @@ export default function App() {
 
     setUsers(updatedUsers)
     setAttendances(updatedAttendances)
-    await saveDataToFirebase(academyData, posts, updatedUsers, updatedAttendances, notices)
+    await saveDataToFirebase(academyData, posts, updatedUsers, updatedAttendances, notices, classPosts)
+  }
+
+  // 학생기록 입력 함수
+  const handleAddStudentNote = async () => {
+    if (!selectedStudentForNote) {
+      alert('학생을 선택해 주세요.')
+      return
+    }
+    if (!newNoteContent.trim()) {
+      alert('특이사항 내용을 입력해 주세요.')
+      return
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0]
+    const newNote: StudentNote = {
+      id: Date.now().toString(),
+      date: todayStr,
+      content: newNoteContent.trim(),
+      authorId: currentUser?.id || 'ADMIN',
+      createdAt: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+    }
+
+    const updatedUsers = users.map(u => {
+      if (u.id === selectedStudentForNote) {
+        return {
+          ...u,
+          notes: [newNote, ...(u.notes || [])]
+        }
+      }
+      return u
+    })
+
+    setUsers(updatedUsers)
+    setNewNoteContent('')
+    await saveDataToFirebase(academyData, posts, updatedUsers, attendances, notices, classPosts)
+    alert('특이사항이 누적 저장되었습니다.')
   }
 
   const handleAdminModeChange = (newMode: AdminMode) => {
@@ -510,7 +573,7 @@ export default function App() {
     }
 
     setAttendances(updatedList)
-    await saveDataToFirebase(academyData, posts, users, updatedList, notices)
+    await saveDataToFirebase(academyData, posts, users, updatedList, notices, classPosts)
   }
 
   const handleManualAttendance = async (studentId: string) => {
@@ -549,7 +612,7 @@ export default function App() {
   const handleSaveGlobalNotice = async (noticeStr: string) => {
     const updated = { ...notices, globalNotice: noticeStr }
     setNotices(updated)
-    await saveDataToFirebase(academyData, posts, users, attendances, updated)
+    await saveDataToFirebase(academyData, posts, users, attendances, updated, classPosts)
     alert('전체 공지가 저장/업데이트되었습니다.')
   }
 
@@ -559,7 +622,7 @@ export default function App() {
       categoryNotices: { ...notices.categoryNotices, [cat]: noticeStr }
     }
     setNotices(updated)
-    await saveDataToFirebase(academyData, posts, users, attendances, updated)
+    await saveDataToFirebase(academyData, posts, users, attendances, updated, classPosts)
     alert('부별 공지가 저장/업데이트되었습니다.')
   }
 
@@ -569,17 +632,18 @@ export default function App() {
       personalNotices: { ...notices.personalNotices, [targetId]: noticeStr }
     }
     setNotices(updated)
-    await saveDataToFirebase(academyData, posts, users, attendances, updated)
+    await saveDataToFirebase(academyData, posts, users, attendances, updated, classPosts)
     alert('개인 맞춤 공지가 저장/업데이트되었습니다.')
   }
 
-  const handleLikePost = async (postId: string) => {
+  const handleLikePost = async (postId: string, isClass = false) => {
     if (!currentUser) {
       alert('로그인이 필요합니다.')
       return
     }
 
-    const updatedPosts = posts.map(p => {
+    const targetList = isClass ? classPosts : posts
+    const updated = targetList.map(p => {
       if (p.id === postId) {
         const alreadyLiked = p.likedUsers?.includes(currentUser.id)
         if (alreadyLiked) {
@@ -595,11 +659,13 @@ export default function App() {
       return p
     })
 
-    setPosts(updatedPosts)
-    await saveDataToFirebase(academyData, updatedPosts, users, attendances, notices)
+    if (isClass) setClassPosts(updated)
+    else setPosts(updated)
+
+    await saveDataToFirebase(academyData, isClass ? posts : updated, users, attendances, notices, isClass ? updated : classPosts)
   }
 
-  const handleAddComment = async (postId: string) => {
+  const handleAddComment = async (postId: string, isClass = false) => {
     if (!currentUser) {
       alert('로그인이 필요합니다.')
       return
@@ -620,47 +686,61 @@ export default function App() {
       })
     }
 
-    const updatedPosts = posts.map(p => {
+    const targetList = isClass ? classPosts : posts
+    const updated = targetList.map(p => {
       if (p.id === postId) {
         return { ...p, comments: [newComment, ...(p.comments || [])] }
       }
       return p
     })
 
-    setPosts(updatedPosts)
+    if (isClass) setClassPosts(updated)
+    else setPosts(updated)
+
     setCommentInputs(prev => ({ ...prev, [postId]: '' }))
-    await saveDataToFirebase(academyData, updatedPosts, users, attendances, notices)
+    await saveDataToFirebase(academyData, isClass ? posts : updated, users, attendances, notices, isClass ? updated : classPosts)
   }
 
-  const handleDeleteComment = async (postId: string, comment: Comment) => {
+  const handleDeleteComment = async (postId: string, comment: Comment, isClass = false) => {
     if (!currentUser) return
     if (currentUser.role === 'ADMIN' || currentUser.id === comment.authorId) {
-      const updatedPosts = posts.map(p => {
+      const targetList = isClass ? classPosts : posts
+      const updated = targetList.map(p => {
         if (p.id === postId) {
           return { ...p, comments: p.comments.filter(c => c.id !== comment.id) }
         }
         return p
       })
-      setPosts(updatedPosts)
-      await saveDataToFirebase(academyData, updatedPosts, users, attendances, notices)
+      if (isClass) setClassPosts(updated)
+      else setPosts(updated)
+      await saveDataToFirebase(academyData, isClass ? posts : updated, users, attendances, notices, isClass ? updated : classPosts)
     }
   }
 
-  const handleDeletePost = async (post: Post) => {
+  const handleDeletePost = async (post: Post, isClass = false) => {
     if (!currentUser) return
     if (currentUser.role === 'ADMIN' || currentUser.id === post.authorId) {
       if (window.confirm('정말 삭제하시겠습니까?')) {
-        const updated = posts.filter(p => p.id !== post.id)
-        setPosts(updated)
-        await saveDataToFirebase(academyData, updated, users, attendances, notices)
+        if (isClass) {
+          const updated = classPosts.filter(p => p.id !== post.id)
+          setClassPosts(updated)
+          await saveDataToFirebase(academyData, posts, users, attendances, notices, updated)
+        } else {
+          const updated = posts.filter(p => p.id !== post.id)
+          setPosts(updated)
+          await saveDataToFirebase(academyData, updated, users, attendances, notices, classPosts)
+        }
       }
     }
   }
 
-  const handleCreatePost = async (e: React.FormEvent) => {
+  const handleCreatePost = async (e: React.FormEvent, isClass = false) => {
     e.preventDefault()
     if (!currentUser) return
-    if (!newTitle.trim() || !newContent.trim()) {
+    const title = isClass ? newClassTitle : newTitle
+    const content = isClass ? newClassContent : newContent
+
+    if (!title.trim() || !content.trim()) {
       alert('제목과 내용을 입력하세요.')
       return
     }
@@ -669,8 +749,8 @@ export default function App() {
       id: Date.now().toString(),
       authorId: currentUser.id,
       authorName: currentUser.name,
-      title: newTitle.trim(),
-      content: newContent.trim(),
+      title: title.trim(),
+      content: content.trim(),
       createdAt: new Date().toLocaleDateString('ko-KR', {
         year: 'numeric',
         month: '2-digit',
@@ -683,11 +763,43 @@ export default function App() {
       comments: []
     }
 
-    const updatedPosts = [newPost, ...posts]
-    setPosts(updatedPosts)
-    setNewTitle(''); setNewContent('')
-    setShowWriteForm(false)
-    await saveDataToFirebase(academyData, updatedPosts, users, attendances, notices)
+    if (isClass) {
+      const updated = [newPost, ...classPosts]
+      setClassPosts(updated)
+      setNewClassTitle(''); setNewClassContent('')
+      setShowClassWriteForm(false)
+      await saveDataToFirebase(academyData, posts, users, attendances, notices, updated)
+    } else {
+      const updated = [newPost, ...posts]
+      setPosts(updated)
+      setNewTitle(''); setNewContent('')
+      setShowWriteForm(false)
+      await saveDataToFirebase(academyData, updated, users, attendances, notices, classPosts)
+    }
+  }
+
+  // 마우스 드래그 스크롤 핸들러
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!navRef.current) return
+    setIsMouseDown(true)
+    setStartX(e.pageX - navRef.current.offsetLeft)
+    setScrollLeft(navRef.current.scrollLeft)
+  }
+
+  const handleMouseLeave = () => {
+    setIsMouseDown(false)
+  }
+
+  const handleMouseUp = () => {
+    setIsMouseDown(false)
+  }
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isMouseDown || !navRef.current) return
+    e.preventDefault()
+    const x = e.pageX - navRef.current.offsetLeft
+    const walk = (x - startX) * 2
+    navRef.current.scrollLeft = scrollLeft - walk
   }
 
   const getFilteredAttendances = () => {
@@ -974,6 +1086,9 @@ export default function App() {
     )
   }
 
+  // 사용자 수업게시판 접근 권한 판별
+  const canAccessClassBoard = currentUser && (currentUser.role === 'ADMIN' || currentUser.category !== 'GENERAL')
+
   if (currentUser?.role === 'ADMIN' && adminMode === 'QR') {
     return (
       <div className="qr-only-wrapper">
@@ -1031,6 +1146,7 @@ export default function App() {
             <div className="user-info-bar">
               <span>
                 <strong>{currentUser.id}</strong>({currentUser.name}) [{currentUser.role === 'ADMIN' ? '관리자' : CATEGORY_LABELS[currentUser.category]}]
+                <span className="visit-badge">👁️ 전체 접속: {currentUser.totalVisits || 1}회 / 오늘: {currentUser.todayVisits || 1}회</span>
               </span>
 
               <button
@@ -1114,6 +1230,13 @@ export default function App() {
 
                 {regCategory === 'PARENT' ? (
                   <>
+                    <input
+                      type="text"
+                      placeholder="자녀 아이디 (정확한 ID 입력)"
+                      value={regChildId}
+                      onChange={e => setRegChildId(e.target.value)}
+                      required
+                    />
                     <input
                       type="text"
                       placeholder="자녀 이름"
@@ -1200,13 +1323,27 @@ export default function App() {
         </div>
       )}
 
-      {/* 네비게이션 */}
-      <nav className="academy-nav">
+      {/* 네비게이션 (마우스 드래그 스크롤 지원) */}
+      <nav
+        className="academy-nav"
+        ref={navRef}
+        onMouseDown={handleMouseDown}
+        onMouseLeave={handleMouseLeave}
+        onMouseUp={handleMouseUp}
+        onMouseMove={handleMouseMove}
+      >
         <button className={activeTab === 'about' ? 'active' : ''} onClick={() => setActiveTab('about')}>학원소개</button>
         <button className={activeTab === 'courses' ? 'active' : ''} onClick={() => setActiveTab('courses')}>수강과목</button>
         <button className={activeTab === 'schedule' ? 'active' : ''} onClick={() => setActiveTab('schedule')}>이달의 일정</button>
         <button className={activeTab === 'instructors' ? 'active' : ''} onClick={() => setActiveTab('instructors')}>강사진</button>
-        <button className={activeTab === 'board' ? 'active' : ''} onClick={() => setActiveTab('board')}>게시판</button>
+        <button className={activeTab === 'board' ? 'active' : ''} onClick={() => setActiveTab('board')}>자유 게시판</button>
+
+        {/* 1. 학생/학부모/관리자 전용 수업 게시판 */}
+        {canAccessClassBoard && (
+          <button className={activeTab === 'classBoard' ? 'active' : ''} onClick={() => setActiveTab('classBoard')}>
+            🎓 수업 게시판
+          </button>
+        )}
 
         {currentUser && currentUser.role === 'USER' && currentUser.category !== 'GENERAL' && (
           <button className={activeTab === 'qr' ? 'active' : ''} onClick={() => setActiveTab('qr')}>
@@ -1238,14 +1375,14 @@ export default function App() {
               <textarea rows={3} value={editForm.curriculum} onChange={e => setEditForm({ ...editForm, curriculum: e.target.value })} />
             </label>
             <button className="save-btn" onClick={async () => {
-              await saveDataToFirebase(editForm, posts, users, attendances, notices)
+              await saveDataToFirebase(editForm, posts, users, attendances, notices, classPosts)
               setAcademyData(editForm)
               alert('수정사항이 저장되었습니다!')
             }}>💾 변경사항 저장하기</button>
           </div>
         )}
 
-        {/* 1. 학원 소개 */}
+        {/* 학원 소개 */}
         {activeTab === 'about' && (
           <section className="tab-content">
             <h2>🎧 아인클랑과 함께하는 <br className="mobile-break" />음악 퍼포먼스</h2>
@@ -1253,7 +1390,6 @@ export default function App() {
               <iframe src="https://www.youtube.com/embed/QzKwMGicdwU" title="Performance" allowFullScreen></iframe>
             </div>
 
-            {/* 오시는 길 / 주소 및 지도가 추가된 카드 */}
             <div className="location-box">
               <h3>📍오시는 길</h3>
               <p className="location-address">📌 울산 남구 무거동 옥현로 21 3층 <br className="mobile-break" />(월계초 앞)</p>
@@ -1269,7 +1405,6 @@ export default function App() {
               </div>
 
               <div className="map-iframe-wrapper">
-                
                 <iframe
                   title="Google Maps Location"
                   src="https://www.google.com/maps/embed?pb=!1m5!3m3!1m2!1s0x35662d934d7d169f%3A0x400bd06b53cf9486!2z7JWE7J247YG0656R7J2M7JWF7ZWZ7JuQ!5e0!3m2!1sko!2skr!4v1789316730739!5m2!1sko!2skr"
@@ -1292,7 +1427,7 @@ export default function App() {
           </section>
         )}
 
-        {/* 2. 수강 과목 */}
+        {/* 수강 과목 */}
         {activeTab === 'courses' && (
           <section className="tab-content text-left">
             <h2>🎸 클래스 라인업</h2>
@@ -1316,7 +1451,7 @@ export default function App() {
           </section>
         )}
 
-        {/* 3. 이달의 일정 */}
+        {/* 이달의 일정 */}
         {activeTab === 'schedule' && (
           <section className="tab-content text-left">
             <h2>📅 이달의 레슨 & 라이브 일정</h2>
@@ -1324,7 +1459,7 @@ export default function App() {
           </section>
         )}
 
-        {/* 4. 강사진 */}
+        {/* 강사진 */}
         {activeTab === 'instructors' && (
           <section className="tab-content text-left">
             <h2>👥 프로 아티스트 강사진</h2>
@@ -1334,7 +1469,7 @@ export default function App() {
           </section>
         )}
 
-        {/* 5. 자유 게시판 */}
+        {/* 자유 게시판 */}
         {activeTab === 'board' && (
           <section className="tab-content text-left">
             <div className="board-top-header">
@@ -1349,8 +1484,8 @@ export default function App() {
             </div>
 
             {showWriteForm && currentUser && (
-              <form className="post-create-form" onSubmit={handleCreatePost}>
-                <h3>✍️ 글 작성 ({currentUser.id})</h3>
+              <form className="post-create-form" onSubmit={e => handleCreatePost(e, false)}>
+                <h3>✍️ 글 작성 (작성자: {currentUser.id})</h3>
                 <input type="text" placeholder="제목" value={newTitle} onChange={e => setNewTitle(e.target.value)} className="input-field mb-12" required />
                 <textarea rows={4} placeholder="내용을 입력하세요. (유튜브 주소나 이미지 URL 포함 가능)" value={newContent} onChange={e => setNewContent(e.target.value)} className="input-field text-area" required />
                 <button type="submit" className="submit-post-btn">📌 등록하기</button>
@@ -1358,7 +1493,7 @@ export default function App() {
             )}
 
             <div className="posts-list">
-              {posts.map(post => {
+              {posts.slice((boardPage - 1) * ITEMS_PER_PAGE, boardPage * ITEMS_PER_PAGE).map(post => {
                 const currInput = commentInputs[post.id] || ''
                 const canDelete = currentUser && (currentUser.role === 'ADMIN' || currentUser.id === post.authorId)
                 const isLiked = currentUser && post.likedUsers?.includes(currentUser.id)
@@ -1368,10 +1503,10 @@ export default function App() {
                     <div className="post-header">
                       <div className="post-header-main">
                         <h3 className="post-title">{post.title}</h3>
-                        <span className="post-date">{post.authorId} · {post.createdAt}</span>
+                        <span className="post-date">아이디: {post.authorId} · {post.createdAt}</span>
                       </div>
                       {canDelete && (
-                        <button className="delete-btn" onClick={() => handleDeletePost(post)}>🗑️ 삭제</button>
+                        <button className="delete-btn" onClick={() => handleDeletePost(post, false)}>🗑️ 삭제</button>
                       )}
                     </div>
 
@@ -1380,7 +1515,7 @@ export default function App() {
                     <div className="post-actions">
                       <button
                         className={`like-btn ${isLiked ? 'liked' : ''}`}
-                        onClick={() => handleLikePost(post.id)}
+                        onClick={() => handleLikePost(post.id, false)}
                       >
                         ❤️ 좋아요 {post.likes || 0}
                       </button>
@@ -1397,10 +1532,10 @@ export default function App() {
                               placeholder="댓글을 입력하세요..."
                               value={currInput}
                               onChange={e => setCommentInputs({ ...commentInputs, [post.id]: e.target.value })}
-                              onKeyDown={e => e.key === 'Enter' && handleAddComment(post.id)}
+                              onKeyDown={e => e.key === 'Enter' && handleAddComment(post.id, false)}
                               className="comment-text-input"
                             />
-                            <button type="button" className="add-comment-btn" onClick={() => handleAddComment(post.id)}>등록</button>
+                            <button type="button" className="add-comment-btn" onClick={() => handleAddComment(post.id, false)}>등록</button>
                           </div>
                         </div>
                       )}
@@ -1416,7 +1551,7 @@ export default function App() {
                               <div className="comment-text">{c.text}</div>
                             </div>
                             {(currentUser?.role === 'ADMIN' || currentUser?.id === c.authorId) && (
-                              <button className="comment-del-btn" onClick={() => handleDeleteComment(post.id, c)}>✕</button>
+                              <button className="comment-del-btn" onClick={() => handleDeleteComment(post.id, c, false)}>✕</button>
                             )}
                           </div>
                         ))}
@@ -1426,10 +1561,133 @@ export default function App() {
                 )
               })}
             </div>
+
+            {/* 페이지네이션 */}
+            {posts.length > ITEMS_PER_PAGE && (
+              <div className="pagination-container">
+                {Array.from({ length: Math.ceil(posts.length / ITEMS_PER_PAGE) }).map((_, idx) => (
+                  <button
+                    key={idx}
+                    className={`page-btn ${boardPage === idx + 1 ? 'active' : ''}`}
+                    onClick={() => setBoardPage(idx + 1)}
+                  >
+                    {idx + 1}
+                  </button>
+                ))}
+              </div>
+            )}
           </section>
         )}
 
-        {/* 6. 개인/자녀 QR코드 */}
+        {/* 1. 수업 게시판 (학생 및 학부모 전용, 아이디 표기, 페이지네이션) */}
+        {activeTab === 'classBoard' && canAccessClassBoard && (
+          <section className="tab-content text-left">
+            <div className="board-top-header">
+              <h2>🎓 수업 게시판 (학생 & 학부모 전용)</h2>
+              <button className="toggle-write-btn" onClick={() => setShowClassWriteForm(!showClassWriteForm)}>
+                {showClassWriteForm ? '❌ 작성 창 닫기' : '✍️ 수업 게시글 작성'}
+              </button>
+            </div>
+
+            {showClassWriteForm && (
+              <form className="post-create-form" onSubmit={e => handleCreatePost(e, true)}>
+                <h3>✍️ 수업 게시글 작성 (작성자: {currentUser.id})</h3>
+                <input type="text" placeholder="제목" value={newClassTitle} onChange={e => setNewClassTitle(e.target.value)} className="input-field mb-12" required />
+                <textarea rows={4} placeholder="수업 관련 질의응답이나 내용을 작성해 주세요." value={newClassContent} onChange={e => setNewClassContent(e.target.value)} className="input-field text-area" required />
+                <button type="submit" className="submit-post-btn">📌 등록하기</button>
+              </form>
+            )}
+
+            <div className="posts-list">
+              {classPosts.length === 0 ? (
+                <p className="empty-text">등록된 수업 관련 게시물이 없습니다.</p>
+              ) : (
+                classPosts.slice((classBoardPage - 1) * ITEMS_PER_PAGE, classBoardPage * ITEMS_PER_PAGE).map(post => {
+                  const currInput = commentInputs[post.id] || ''
+                  const canDelete = currentUser && (currentUser.role === 'ADMIN' || currentUser.id === post.authorId)
+                  const isLiked = currentUser && post.likedUsers?.includes(currentUser.id)
+
+                  return (
+                    <article key={post.id} className="post-card">
+                      <div className="post-header">
+                        <div className="post-header-main">
+                          <h3 className="post-title">{post.title}</h3>
+                          <span className="post-date">아이디: {post.authorId} · {post.createdAt}</span>
+                        </div>
+                        {canDelete && (
+                          <button className="delete-btn" onClick={() => handleDeletePost(post, true)}>🗑️ 삭제</button>
+                        )}
+                      </div>
+
+                      {renderPostContent(post.id, post.content)}
+
+                      <div className="post-actions">
+                        <button
+                          className={`like-btn ${isLiked ? 'liked' : ''}`}
+                          onClick={() => handleLikePost(post.id, true)}
+                        >
+                          ❤️ 좋아요 {post.likes || 0}
+                        </button>
+                      </div>
+
+                      <div className="comments-section">
+                        <h4>💬 댓글 ({post.comments?.length || 0})</h4>
+
+                        <div className="comment-form-grid">
+                          <div className="comment-inputs-bottom">
+                            <input
+                              type="text"
+                              placeholder="댓글을 입력하세요..."
+                              value={currInput}
+                              onChange={e => setCommentInputs({ ...commentInputs, [post.id]: e.target.value })}
+                              onKeyDown={e => e.key === 'Enter' && handleAddComment(post.id, true)}
+                              className="comment-text-input"
+                            />
+                            <button type="button" className="add-comment-btn" onClick={() => handleAddComment(post.id, true)}>등록</button>
+                          </div>
+                        </div>
+
+                        <div className="comments-list">
+                          {post.comments?.map(c => (
+                            <div key={c.id} className="comment-item">
+                              <div className="comment-main-info">
+                                <div className="comment-header-row">
+                                  <span className="comment-author">{c.authorId}</span>
+                                  <span className="comment-date">{c.createdAt}</span>
+                                </div>
+                                <div className="comment-text">{c.text}</div>
+                              </div>
+                              {(currentUser?.role === 'ADMIN' || currentUser?.id === c.authorId) && (
+                                <button className="comment-del-btn" onClick={() => handleDeleteComment(post.id, c, true)}>✕</button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </article>
+                  )
+                })
+              )}
+            </div>
+
+            {/* 페이지네이션 */}
+            {classPosts.length > ITEMS_PER_PAGE && (
+              <div className="pagination-container">
+                {Array.from({ length: Math.ceil(classPosts.length / ITEMS_PER_PAGE) }).map((_, idx) => (
+                  <button
+                    key={idx}
+                    className={`page-btn ${classBoardPage === idx + 1 ? 'active' : ''}`}
+                    onClick={() => setClassBoardPage(idx + 1)}
+                  >
+                    {idx + 1}
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* 개인/자녀 QR코드 및 학생 누적 특이사항 조회 */}
         {activeTab === 'qr' && currentUser?.role === 'USER' && currentUser.category !== 'GENERAL' && (
           <section className="tab-content text-center">
             {(() => {
@@ -1456,6 +1714,26 @@ export default function App() {
                   </div>
 
                   {renderUserNotices(targetUser, isParentView)}
+
+                  {/* 3. 누적 특이사항 기록 조회 (학생/학부모 본인 확인) */}
+                  <div className="student-notes-box">
+                    <h3>📝 {isParentView ? `[${targetUser.name}] 자녀의 일일 누적 특이사항` : '나의 일일 누적 특이사항'}</h3>
+                    {(!targetUser.notes || targetUser.notes.length === 0) ? (
+                      <p className="empty-text">등록된 특이사항 기록이 없습니다.</p>
+                    ) : (
+                      <div className="notes-list">
+                        {targetUser.notes.map(note => (
+                          <div key={note.id} className="note-card">
+                            <div className="note-header">
+                              <span className="note-date">📅 {note.date} ({note.createdAt})</span>
+                              <span className="note-author">작성: {note.authorId}</span>
+                            </div>
+                            <p className="note-body">{note.content}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
 
                   {(() => {
                     const myStats = attendanceAnalytics.studentStats.find(s => s.userId === targetUser.id)
@@ -1525,7 +1803,7 @@ export default function App() {
           </section>
         )}
 
-        {/* 7. 관리자 QR 스캐너 */}
+        {/* 관리자 QR 스캐너 */}
         {activeTab === 'qr' && currentUser?.role === 'ADMIN' && adminMode === 'EDIT' && (
           <section className="tab-content text-center">
             <h2>📷 출석 체크 QR 스캐너</h2>
@@ -1538,9 +1816,58 @@ export default function App() {
           </section>
         )}
 
-        {/* 8. 관리자 통계 및 출석 현황 */}
+        {/* 관리자 통계 및 출석/회원 관리 / 학생 기록란 */}
         {activeTab === 'attendance' && currentUser?.role === 'ADMIN' && (
           <section className="tab-content text-left">
+            {/* 3. 학생 기록란 (일일 특이사항 작성 및 누적 저장) */}
+            <h2>📝 학생기록란 (일일 특이사항 누적 작성)</h2>
+            <div className="student-note-management-box">
+              <div className="input-group mb-12">
+                <select
+                  value={selectedStudentForNote}
+                  onChange={e => setSelectedStudentForNote(e.target.value)}
+                  className="select-filter"
+                >
+                  <option value="">-- 학생(원생) 선택 --</option>
+                  {users.filter(u => u.role !== 'ADMIN' && u.category !== 'GENERAL' && u.category !== 'PARENT').map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.id} / {CATEGORY_LABELS[s.category]})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedStudentForNote && (
+                <div className="note-write-container">
+                  <textarea
+                    rows={3}
+                    placeholder="해당 학생의 일일 특이사항, 수업 진도, 상담 내용 등을 입력하세요..."
+                    value={newNoteContent}
+                    onChange={e => setNewNoteContent(e.target.value)}
+                    className="input-field mb-12"
+                  />
+                  <button onClick={handleAddStudentNote} className="submit-post-btn mb-12">💾 특이사항 누적 저장</button>
+
+                  <h4>📋 [{users.find(u => u.id === selectedStudentForNote)?.name}] 학생 누적 기록 목록</h4>
+                  <div className="notes-list">
+                    {users.find(u => u.id === selectedStudentForNote)?.notes?.length === 0 ? (
+                      <p className="empty-text">저장된 특이사항이 없습니다.</p>
+                    ) : (
+                      users.find(u => u.id === selectedStudentForNote)?.notes?.map(note => (
+                        <div key={note.id} className="note-card">
+                          <div className="note-header">
+                            <span className="note-date">📅 {note.date} ({note.createdAt})</span>
+                            <span className="note-author">작성: {note.authorId}</span>
+                          </div>
+                          <p className="note-body">{note.content}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <h2>📢 회원 QR 바코드 밑 공지사항 작성</h2>
             <div className="notice-management-box">
               <div className="notice-editor-card">
@@ -1676,7 +2003,8 @@ export default function App() {
               </div>
             </div>
 
-            <h2>📋 원생 수동 등하원 체크 및 전체 회원 관리</h2>
+            {/* 4. 회원별 웹페이지 접속 카운트(전체/오늘) 및 현황 */}
+            <h2>📋 원생 수동 등하원 체크 및 회원 접속 통계 관리</h2>
             <div className="table-responsive mb-24">
               <table className="attendance-table">
                 <thead>
@@ -1684,7 +2012,7 @@ export default function App() {
                     <th>아이디</th>
                     <th>이름</th>
                     <th>분류</th>
-                    <th>좋아하는 음식</th>
+                    <th>접속 카운트 (전체 / 오늘)</th>
                     <th>수동 등/하원 체크</th>
                     <th>회원 관리</th>
                   </tr>
@@ -1703,7 +2031,11 @@ export default function App() {
                           {u.childName && <span className="child-badge"> (자녀: {u.childName})</span>}
                         </td>
                         <td>{CATEGORY_LABELS[u.category]}</td>
-                        <td>{u.reason}</td>
+                        <td>
+                          <span className="visit-badge-table">
+                            👁️ 전체: {u.totalVisits || 1}회 / 오늘: {u.lastVisitDate === todayStr ? (u.todayVisits || 1) : 0}회
+                          </span>
+                        </td>
                         <td>
                           {isAttending ? (
                             <button

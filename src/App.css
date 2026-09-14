@@ -1412,3 +1412,676 @@ body {
     display: inline;
   }
 }
+
+/* =========================================================
+   Vibe Music Academy - 트렌디 & 반응형 스타일
+   ========================================================= */
+
+:root {
+  --primary-color: #06b6d4;
+  --primary-hover: #0891b2;
+  --primary-gradient: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+  --accent-gradient: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+  --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+  --card-bg: rgba(30, 41, 59, 0.85);
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --radius-lg: 20px;
+  --radius-md: 14px;
+  --radius-sm: 8px;
+}
+
+/* Reset 및 기본 스타일 */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  font-size: 16px;
+}
+
+body {
+  width: 100%;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background: #0f172a;
+  background: var(--bg-gradient);
+  background-attachment: fixed;
+  font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", Roboto, sans-serif;
+  color: var(--text-main);
+  line-height: 1.5;
+}
+
+#root {
+  width: 100%;
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 0.75rem;
+}
+
+/* 여백 유틸리티 */
+.mb-12 { margin-bottom: 12px; }
+.mb-24 { margin-bottom: 24px; }
+.text-left { text-align: left; }
+.text-center { text-align: center; }
+
+/* 1. 헤더 & 배너 */
+.academy-header {
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
+.header-banner {
+  width: 100%;
+  height: 220px;
+  background-size: cover;
+  background-position: center;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.banner-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(15, 23, 42, 0.95) 10%, rgba(15, 23, 42, 0.4) 100%);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 1.25rem;
+}
+
+.badge-neon {
+  align-self: flex-start;
+  background: rgba(6, 182, 212, 0.2);
+  color: #38bdf8;
+  border: 1px solid #06b6d4;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 20px;
+  margin-bottom: 6px;
+  letter-spacing: 0.5px;
+}
+
+.banner-overlay h1 {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #ffffff;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  margin-bottom: 4px;
+}
+
+.subtitle {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+/* 접속 카운트 뱃지 */
+.visit-badge {
+  display: inline-block;
+  margin-left: 8px;
+  background: rgba(6, 182, 212, 0.2);
+  border: 1px solid rgba(6, 182, 212, 0.4);
+  color: #38bdf8;
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.visit-badge-table {
+  color: #38bdf8;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+/* 관리자 로그인 바 및 사용자 정보 */
+.admin-bar {
+  margin-top: 8px;
+  text-align: right;
+}
+
+.admin-btn {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 6px 12px;
+  border-radius: 16px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.admin-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.user-info-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+  color: #f8fafc;
+  font-size: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.edit-profile-btn {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.info-badge {
+  font-size: 0.8rem;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.1);
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+
+/* 5. 네비게이션 탭 (드래그 스크롤 지원) */
+.academy-nav {
+  display: flex;
+  width: 100%;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  cursor: grab;
+  user-select: none;
+}
+
+.academy-nav:active {
+  cursor: grabbing;
+}
+
+.academy-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.academy-nav button {
+  flex: 0 0 auto;
+  padding: 0.7rem 1.1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: var(--card-bg);
+  color: var(--text-muted);
+  border-radius: 24px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 700;
+  backdrop-filter: blur(8px);
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.academy-nav button.active {
+  background: var(--primary-gradient);
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: 0 4px 16px rgba(6, 182, 212, 0.4);
+}
+
+/* 3. 메인 컨텐츠 영역 */
+.tab-content {
+  width: 100%;
+  background: var(--card-bg);
+  padding: 1.25rem 1rem;
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.tab-content h2 {
+  font-size: 1.25rem;
+  color: #ffffff;
+  margin-top: 1.25rem;
+  margin-bottom: 0.75rem;
+  font-weight: 700;
+}
+
+.tab-content h2:first-child {
+  margin-top: 0;
+}
+
+.empty-text {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  padding: 10px 0;
+}
+
+/* 학생기록란 전용 스타일 */
+.student-note-management-box {
+  background: rgba(15, 23, 42, 0.6);
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 2rem;
+}
+
+.student-notes-box {
+  margin-top: 1.5rem;
+  margin-bottom: 1.5rem;
+  text-align: left;
+  background: rgba(15, 23, 42, 0.6);
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.student-notes-box h3 {
+  font-size: 1.05rem;
+  color: #38bdf8;
+  margin-bottom: 12px;
+}
+
+.notes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.note-card {
+  background: rgba(30, 41, 59, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 12px;
+  border-radius: 10px;
+}
+
+.note-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: #38bdf8;
+  margin-bottom: 6px;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
+  padding-bottom: 4px;
+}
+
+.note-body {
+  font-size: 0.88rem;
+  color: #f8fafc;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+/* 페이지네이션 버튼 */
+.pagination-container {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 1.5rem;
+}
+
+.page-btn {
+  background: rgba(30, 41, 59, 0.8);
+  color: var(--text-muted);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.2s;
+}
+
+.page-btn.active {
+  background: #0284c7;
+  color: white;
+  border-color: #0284c7;
+}
+
+/* 4. 공지사항 관리 카드 */
+.notice-management-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 2rem;
+  background: rgba(15, 23, 42, 0.6);
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.notice-editor-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.notice-editor-card h4 {
+  font-size: 0.85rem;
+  color: #38bdf8;
+}
+
+.input-group {
+  display: flex;
+  gap: 8px;
+}
+
+.input-group input, .input-group select {
+  flex: 1;
+  padding: 8px 12px;
+  background: rgba(30, 41, 59, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+}
+
+.input-group button {
+  padding: 8px 16px;
+  background: #0284c7;
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-weight: bold;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* 5. 자유 및 수업 게시판 스타일 */
+.board-top-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+}
+
+.toggle-write-btn {
+  background: var(--primary-gradient);
+  color: #ffffff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);
+  transition: transform 0.2s, opacity 0.2s;
+}
+
+.toggle-write-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.post-create-form {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 1.25rem;
+  border-radius: var(--radius-md);
+  margin-bottom: 1.5rem;
+}
+
+.post-create-form h3 {
+  font-size: 1.05rem;
+  color: #38bdf8;
+  margin-bottom: 10px;
+}
+
+.input-field {
+  width: 100%;
+  padding: 10px 14px;
+  background: rgba(30, 41, 59, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-sm);
+  color: #fff;
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.input-field:focus {
+  border-color: #06b6d4;
+}
+
+.text-area {
+  width: 100%;
+  resize: vertical;
+  margin-bottom: 10px;
+}
+
+.submit-post-btn {
+  width: 100%;
+  background: var(--primary-gradient);
+  color: #fff;
+  border: none;
+  padding: 11px;
+  border-radius: 20px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.submit-post-btn:hover {
+  opacity: 0.9;
+}
+
+.posts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.post-card {
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+}
+
+.post-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.post-header-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.post-title {
+  font-size: 1.15rem;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.post-date {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.delete-btn {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.delete-btn:hover {
+  background: rgba(239, 68, 68, 0.3);
+}
+
+.post-text-body {
+  white-space: pre-wrap;
+  color: #e2e8f0;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin-bottom: 1rem;
+}
+
+.post-actions {
+  display: flex;
+  align-items: center;
+  margin: 12px 0;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
+.like-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #f43f5e;
+  padding: 6px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.like-btn.liked {
+  background: #f43f5e;
+  color: #ffffff;
+  border-color: #f43f5e;
+}
+
+/* 댓글 */
+.comments-section {
+  margin-top: 15px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  width: 100%;
+}
+
+.comments-section h4 {
+  font-size: 0.9rem;
+  color: #94a3b8;
+  margin-bottom: 10px;
+}
+
+.comment-form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.comment-inputs-bottom {
+  display: flex;
+  gap: 8px;
+}
+
+.comment-text-input {
+  flex: 1;
+  padding: 8px 12px;
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 0.85rem;
+}
+
+.add-comment-btn {
+  padding: 8px 16px;
+  background: #0284c7;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.comments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.comment-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 10px 12px;
+  background: rgba(30, 41, 59, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+}
+
+.comment-main-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.comment-header-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.comment-author {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #38bdf8;
+}
+
+.comment-date {
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
+.comment-text {
+  font-size: 0.85rem;
+  color: #e2e8f0;
+}
+
+.comment-del-btn {
+  background: rgba(239, 68, 68, 0.1);
+  border: none;
+  color: #f87171;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+/* 푸터 및 통계 테이블 기본 설정 유지 */
+.table-responsive { width: 100%; overflow-x: auto; }
+
+.attendance-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  font-size: 0.85rem;
+}
+
+.attendance-table th, .attendance-table td {
+  padding: 10px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.attendance-table th {
+  background: rgba(30, 41, 59, 0.9);
+  color: #38bdf8;
+  font-weight: 700;
+}
+
+.academy-footer {
+  margin-top: 2rem;
+  padding: 1rem 0;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
