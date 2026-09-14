@@ -171,7 +171,12 @@ export default function App() {
     personalNotices: {}
   })
 
-  const [currentUser, setCurrentUser] = useState<User | null>(null)
+  // 새로고침 시 로그인 유지 (Local Storage 세션 관리)
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    const saved = localStorage.getItem('einklang_current_user')
+    return saved ? JSON.parse(saved) : null
+  })
+
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false)
   const [authMode, setAuthMode] = useState<'LOGIN' | 'REGISTER' | 'DELETE_ACCOUNT' | 'EDIT_PROFILE'>('LOGIN')
 
@@ -210,9 +215,10 @@ export default function App() {
   const [classBoardPage, setClassBoardPage] = useState<number>(1)
   const ITEMS_PER_PAGE = 5
 
-  // 학생기록관리 상태
+  // 학생기록 관리 및 페이지네이션 상태
   const [selectedStudentForNote, setSelectedStudentForNote] = useState<string>('')
   const [newNoteContent, setNewNoteContent] = useState<string>('')
+  const [studentNotePage, setStudentNotePage] = useState<number>(1)
 
   const [editForm, setEditForm] = useState<AcademyData>(academyData)
   const [adminMode, setAdminMode] = useState<AdminMode>('VIEW')
@@ -239,6 +245,15 @@ export default function App() {
   const [startX, setStartX] = useState(0)
   const [scrollLeft, setScrollLeft] = useState(0)
 
+  // 로그인 상태 동기화 (로컬 스토리지)
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('einklang_current_user', JSON.stringify(currentUser))
+    } else {
+      localStorage.removeItem('einklang_current_user')
+    }
+  }, [currentUser])
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -262,6 +277,10 @@ export default function App() {
               if (!merged.find(exist => exist.id === u.id)) merged.push(u)
             })
             setUsers(merged)
+            if (currentUser) {
+              const updatedCurr = merged.find(u => u.id === currentUser.id)
+              if (updatedCurr) setCurrentUser(updatedCurr)
+            }
           }
           if (fetched.attendances) setAttendances(fetched.attendances)
           if (fetched.notices) setNotices(fetched.notices)
@@ -467,7 +486,7 @@ export default function App() {
     await saveDataToFirebase(academyData, posts, updatedUsers, updatedAttendances, notices, classPosts)
   }
 
-  // 학생기록 입력 함수
+  // 학생기록 누적 저장
   const handleAddStudentNote = async () => {
     if (!selectedStudentForNote) {
       alert('학생을 선택해 주세요.')
@@ -499,6 +518,7 @@ export default function App() {
 
     setUsers(updatedUsers)
     setNewNoteContent('')
+    setStudentNotePage(1)
     await saveDataToFirebase(academyData, posts, updatedUsers, attendances, notices, classPosts)
     alert('특이사항이 누적 저장되었습니다.')
   }
@@ -609,6 +629,7 @@ export default function App() {
     }
   }, [activeTab, currentUser, adminMode])
 
+  // 2. 공지사항 저장 및 실시간 상태 동기화 처리
   const handleSaveGlobalNotice = async (noticeStr: string) => {
     const updated = { ...notices, globalNotice: noticeStr }
     setNotices(updated)
@@ -1338,7 +1359,6 @@ export default function App() {
         <button className={activeTab === 'instructors' ? 'active' : ''} onClick={() => setActiveTab('instructors')}>강사진</button>
         <button className={activeTab === 'board' ? 'active' : ''} onClick={() => setActiveTab('board')}>자유 게시판</button>
 
-        {/* 1. 학생/학부모/관리자 전용 수업 게시판 */}
         {canAccessClassBoard && (
           <button className={activeTab === 'classBoard' ? 'active' : ''} onClick={() => setActiveTab('classBoard')}>
             🎓 수업 게시판
@@ -1363,6 +1383,7 @@ export default function App() {
 
       {/* Main Content */}
       <main className="academy-content">
+        {/* 3. 관리자 수정모드에서 '강사진'도 수정 가능하도록 항목 확장 */}
         {currentUser?.role === 'ADMIN' && adminMode === 'EDIT' && (
           <div className="admin-editor-box">
             <h3>✏️ [수정 모드] 학원 콘텐츠 관리</h3>
@@ -1374,10 +1395,14 @@ export default function App() {
               <strong>커리큘럼 공지:</strong>
               <textarea rows={3} value={editForm.curriculum} onChange={e => setEditForm({ ...editForm, curriculum: e.target.value })} />
             </label>
+            <label>
+              <strong>강사진 정보 수정:</strong>
+              <textarea rows={3} value={editForm.instructors} onChange={e => setEditForm({ ...editForm, instructors: e.target.value })} placeholder="예: 통기타/핑거스타일/ 원장 실용음악과 전공&#10;;보컬 트레이닝/ 보컬 수석 강사" />
+            </label>
             <button className="save-btn" onClick={async () => {
               await saveDataToFirebase(editForm, posts, users, attendances, notices, classPosts)
               setAcademyData(editForm)
-              alert('수정사항이 저장되었습니다!')
+              alert('이달의 일정, 커리큘럼, 강사진 수정사항이 저장되었습니다!')
             }}>💾 변경사항 저장하기</button>
           </div>
         )}
@@ -1562,7 +1587,6 @@ export default function App() {
               })}
             </div>
 
-            {/* 페이지네이션 */}
             {posts.length > ITEMS_PER_PAGE && (
               <div className="pagination-container">
                 {Array.from({ length: Math.ceil(posts.length / ITEMS_PER_PAGE) }).map((_, idx) => (
@@ -1579,7 +1603,7 @@ export default function App() {
           </section>
         )}
 
-        {/* 1. 수업 게시판 (학생 및 학부모 전용, 아이디 표기, 페이지네이션) */}
+        {/* 수업 게시판 */}
         {activeTab === 'classBoard' && canAccessClassBoard && (
           <section className="tab-content text-left">
             <div className="board-top-header">
@@ -1670,7 +1694,6 @@ export default function App() {
               )}
             </div>
 
-            {/* 페이지네이션 */}
             {classPosts.length > ITEMS_PER_PAGE && (
               <div className="pagination-container">
                 {Array.from({ length: Math.ceil(classPosts.length / ITEMS_PER_PAGE) }).map((_, idx) => (
@@ -1687,7 +1710,7 @@ export default function App() {
           </section>
         )}
 
-        {/* 개인/자녀 QR코드 및 학생 누적 특이사항 조회 */}
+        {/* 학생/학부모 QR 확인 및 일일 누적 특이사항 확인 */}
         {activeTab === 'qr' && currentUser?.role === 'USER' && currentUser.category !== 'GENERAL' && (
           <section className="tab-content text-center">
             {(() => {
@@ -1697,6 +1720,11 @@ export default function App() {
 
               const isParentView = currentUser.category === 'PARENT'
               const today = new Date()
+
+              // 1. 작성자 표시 제거 및 학생기록란 5개씩 페이지네이션
+              const userNotes = targetUser.notes || []
+              const totalNotePages = Math.ceil(userNotes.length / ITEMS_PER_PAGE)
+              const paginatedNotes = userNotes.slice((studentNotePage - 1) * ITEMS_PER_PAGE, studentNotePage * ITEMS_PER_PAGE)
 
               return (
                 <>
@@ -1715,23 +1743,38 @@ export default function App() {
 
                   {renderUserNotices(targetUser, isParentView)}
 
-                  {/* 3. 누적 특이사항 기록 조회 (학생/학부모 본인 확인) */}
+                  {/* 1. 작성자 제거 및 5개씩 페이지네이션이 적용된 누적 특이사항 조회 */}
                   <div className="student-notes-box">
                     <h3>📝 {isParentView ? `[${targetUser.name}] 자녀의 일일 누적 특이사항` : '나의 일일 누적 특이사항'}</h3>
-                    {(!targetUser.notes || targetUser.notes.length === 0) ? (
+                    {userNotes.length === 0 ? (
                       <p className="empty-text">등록된 특이사항 기록이 없습니다.</p>
                     ) : (
-                      <div className="notes-list">
-                        {targetUser.notes.map(note => (
-                          <div key={note.id} className="note-card">
-                            <div className="note-header">
-                              <span className="note-date">📅 {note.date} ({note.createdAt})</span>
-                              <span className="note-author">작성: {note.authorId}</span>
+                      <>
+                        <div className="notes-list">
+                          {paginatedNotes.map(note => (
+                            <div key={note.id} className="note-card">
+                              <div className="note-header">
+                                <span className="note-date">📅 {note.date} ({note.createdAt})</span>
+                              </div>
+                              <p className="note-body">{note.content}</p>
                             </div>
-                            <p className="note-body">{note.content}</p>
+                          ))}
+                        </div>
+
+                        {totalNotePages > 1 && (
+                          <div className="pagination-container">
+                            {Array.from({ length: totalNotePages }).map((_, idx) => (
+                              <button
+                                key={idx}
+                                className={`page-btn ${studentNotePage === idx + 1 ? 'active' : ''}`}
+                                onClick={() => setStudentNotePage(idx + 1)}
+                              >
+                                {idx + 1}
+                              </button>
+                            ))}
                           </div>
-                        ))}
-                      </div>
+                        )}
+                      </>
                     )}
                   </div>
 
@@ -1819,13 +1862,16 @@ export default function App() {
         {/* 관리자 통계 및 출석/회원 관리 / 학생 기록란 */}
         {activeTab === 'attendance' && currentUser?.role === 'ADMIN' && (
           <section className="tab-content text-left">
-            {/* 3. 학생 기록란 (일일 특이사항 작성 및 누적 저장) */}
+            {/* 1. 학생 기록란 (작성자 제거 & 5개 단위 페이지네이션 추가) */}
             <h2>📝 학생기록란 (일일 특이사항 누적 작성)</h2>
             <div className="student-note-management-box">
               <div className="input-group mb-12">
                 <select
                   value={selectedStudentForNote}
-                  onChange={e => setSelectedStudentForNote(e.target.value)}
+                  onChange={e => {
+                    setSelectedStudentForNote(e.target.value)
+                    setStudentNotePage(1)
+                  }}
                   className="select-filter"
                 >
                   <option value="">-- 학생(원생) 선택 --</option>
@@ -1837,37 +1883,58 @@ export default function App() {
                 </select>
               </div>
 
-              {selectedStudentForNote && (
-                <div className="note-write-container">
-                  <textarea
-                    rows={3}
-                    placeholder="해당 학생의 일일 특이사항, 수업 진도, 상담 내용 등을 입력하세요..."
-                    value={newNoteContent}
-                    onChange={e => setNewNoteContent(e.target.value)}
-                    className="input-field mb-12"
-                  />
-                  <button onClick={handleAddStudentNote} className="submit-post-btn mb-12">💾 특이사항 누적 저장</button>
+              {selectedStudentForNote && (() => {
+                const selectedUser = users.find(u => u.id === selectedStudentForNote)
+                const notesList = selectedUser?.notes || []
+                const totalNotePages = Math.ceil(notesList.length / ITEMS_PER_PAGE)
+                const currentNotes = notesList.slice((studentNotePage - 1) * ITEMS_PER_PAGE, studentNotePage * ITEMS_PER_PAGE)
 
-                  <h4>📋 [{users.find(u => u.id === selectedStudentForNote)?.name}] 학생 누적 기록 목록</h4>
-                  <div className="notes-list">
-                    {users.find(u => u.id === selectedStudentForNote)?.notes?.length === 0 ? (
-                      <p className="empty-text">저장된 특이사항이 없습니다.</p>
-                    ) : (
-                      users.find(u => u.id === selectedStudentForNote)?.notes?.map(note => (
-                        <div key={note.id} className="note-card">
-                          <div className="note-header">
-                            <span className="note-date">📅 {note.date} ({note.createdAt})</span>
-                            <span className="note-author">작성: {note.authorId}</span>
+                return (
+                  <div className="note-write-container">
+                    <textarea
+                      rows={3}
+                      placeholder="해당 학생의 일일 특이사항, 수업 진도, 상담 내용 등을 입력하세요..."
+                      value={newNoteContent}
+                      onChange={e => setNewNoteContent(e.target.value)}
+                      className="input-field mb-12"
+                    />
+                    <button onClick={handleAddStudentNote} className="submit-post-btn mb-12">💾 특이사항 누적 저장</button>
+
+                    <h4>📋 [{selectedUser?.name}] 학생 누적 기록 목록</h4>
+                    <div className="notes-list">
+                      {notesList.length === 0 ? (
+                        <p className="empty-text">저장된 특이사항이 없습니다.</p>
+                      ) : (
+                        currentNotes.map(note => (
+                          <div key={note.id} className="note-card">
+                            <div className="note-header">
+                              <span className="note-date">📅 {note.date} ({note.createdAt})</span>
+                            </div>
+                            <p className="note-body">{note.content}</p>
                           </div>
-                          <p className="note-body">{note.content}</p>
-                        </div>
-                      ))
+                        ))
+                      )}
+                    </div>
+
+                    {totalNotePages > 1 && (
+                      <div className="pagination-container mb-12">
+                        {Array.from({ length: totalNotePages }).map((_, idx) => (
+                          <button
+                            key={idx}
+                            className={`page-btn ${studentNotePage === idx + 1 ? 'active' : ''}`}
+                            onClick={() => setStudentNotePage(idx + 1)}
+                          >
+                            {idx + 1}
+                          </button>
+                        ))}
+                      </div>
                     )}
                   </div>
-                </div>
-              )}
+                )
+              })()}
             </div>
 
+            {/* 2. 공지사항 실시간 업데이트 반영 */}
             <h2>📢 회원 QR 바코드 밑 공지사항 작성</h2>
             <div className="notice-management-box">
               <div className="notice-editor-card">
@@ -1879,7 +1946,7 @@ export default function App() {
                     value={notices.globalNotice || ''}
                     onChange={e => setNotices({ ...notices, globalNotice: e.target.value })}
                   />
-                  <button onClick={() => handleSaveGlobalNotice(notices.globalNotice)}>저장</button>
+                  <button onClick={() => handleSaveGlobalNotice(notices.globalNotice || '')}>저장</button>
                 </div>
               </div>
 
@@ -2003,7 +2070,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* 4. 회원별 웹페이지 접속 카운트(전체/오늘) 및 현황 */}
             <h2>📋 원생 수동 등하원 체크 및 회원 접속 통계 관리</h2>
             <div className="table-responsive mb-24">
               <table className="attendance-table">
