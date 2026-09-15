@@ -1847,7 +1847,20 @@ export default function App() {
                                 {isWithin7Days ? (
                                   <>
                                     <td><span className="badge-in">{a.checkIn}</span></td>
-                                    <td>{a.checkOut ? <span className="badge-out">{a.checkOut}</span> : <span className="badge-pending">수업 중</span>}</td>
+                                    {/* <td>{a.checkOut ? <span className="badge-out">{a.checkOut}</span> : <span className="badge-pending">수업 중</span>}</td> */}
+                                    <td>{(() => {
+                                        const todayStr = new Date().toISOString().split('T')[0];
+                                        const isToday = a.date === todayStr;
+
+                                        if (a.checkOut) {
+                                          return <span className="badge-out">{a.checkOut}</span>;
+                                        } else if (isToday) {
+                                          return <span className="badge-pending">수업중</span>;
+                                        } else {
+                                          return <span className="badge-danger" style={{ color: '#f87171' }}>체크안됨</span>;
+                                        }
+                                      })()}
+                                    </td>
                                   </>
                                 ) : (
                                   <td colSpan={2} style={{ textAlign: 'center', color: '#4ade80' }}>
@@ -2218,7 +2231,7 @@ export default function App() {
                                 const isToday = a.date === todayStr;
 
                                 if (a.checkOut) {
-                                  return <span className="badge-out">{a.checkOut} (하원)</span>;
+                                  return <span className="badge-out">{a.checkOut}</span>;
                                 } else if (isToday) {
                                   return <span className="badge-pending">수업중</span>;
                                 } else {
