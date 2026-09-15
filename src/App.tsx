@@ -1824,10 +1824,10 @@ export default function App() {
                     <table className="attendance-table">
                       <thead>
                         <tr>
-                          <th>날짜 / 요일</th>
+                          <th>날짜/요일</th>
                           <th>주차</th>
-                          <th>등원 현황</th>
-                          <th>하원 현황</th>
+                          <th>등원</th>
+                          <th>하원</th>
                         </tr>
                       </thead>
                       <tbody>
