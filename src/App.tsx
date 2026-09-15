@@ -2212,7 +2212,20 @@ export default function App() {
                           <td>{CATEGORY_LABELS[a.userCategory]}</td>
                           <td>{a.userName} ({a.userId})</td>
                           <td><span className="badge-in">{a.checkIn}</span></td>
-                          <td>{a.checkOut ? <span className="badge-out">{a.checkOut}</span> : <span className="badge-pending">수업 중</span>}</td>
+                          {/* <td>{a.checkOut ? <span className="badge-out">{a.checkOut}</span> : <span className="badge-pending">수업 중</span>}</td> */}
+                          <td>{(() => {
+                                const todayStr = new Date().toISOString().split('T')[0];
+                                const isToday = a.date === todayStr;
+
+                                if (a.checkOut) {
+                                  return <span className="badge-out">{a.checkOut} (하원)</span>;
+                                } else if (isToday) {
+                                  return <span className="badge-pending">수업중</span>;
+                                } else {
+                                  return <span className="badge-danger" style={{ color: '#f87171' }}>체크안됨</span>;
+                                }
+                              })()}
+                          </td>
                         </tr>
                       )
                     })
