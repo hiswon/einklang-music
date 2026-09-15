@@ -1968,7 +1968,7 @@ export default function App() {
                 <div className="input-group">
                   <input
                     type="text"
-                    placeholder="전체 공지 메시지 입력..."
+                    placeholder="전체공지 입력"
                     value={notices.globalNotice || ''}
                     onChange={e => setNotices({ ...notices, globalNotice: e.target.value })}
                   />
@@ -1990,7 +1990,7 @@ export default function App() {
                   </select>
                   <input
                     type="text"
-                    placeholder="부별 공지 메시지 입력..."
+                    placeholder="부별공지 입력"
                     value={inputCategoryNotice}
                     onChange={e => setInputCategoryNotice(e.target.value)}
                   />
@@ -2015,7 +2015,7 @@ export default function App() {
                   </select>
                   <input
                     type="text"
-                    placeholder="개인 공지 메시지 입력..."
+                    placeholder="개인공지 입력"
                     value={inputPersonalNotice}
                     onChange={e => setInputPersonalNotice(e.target.value)}
                   />
