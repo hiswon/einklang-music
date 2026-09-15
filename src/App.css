@@ -2085,3 +2085,31 @@ body {
   font-size: 0.8rem;
   color: var(--text-muted);
 }
+
+/* 1. 모든 input 및 select 박스 요소가 너비를 벗어나지 않도록 기본 처리 */
+.input-group input,
+.input-group select,
+.input-group button {
+  box-sizing: border-box; /* 패딩과 테두리를 너비에 포함 */
+  max-width: 100%;       /* 부모 요소를 넘치지 않도록 제한 */
+}
+
+/* 2. input-group의 기본 레이아웃 및 텍스트 넘침 방지 */
+.input-group {
+  display: flex;
+  flex-wrap: wrap;       /* 모바일 등 공간이 부족할 때 자동 줄바꿈 허용 */
+  gap: 8px;              /* 요소 간 간격 설정 */
+  width: 100%;
+}
+
+/* Flex 항목들이 유연하게 줄어들 수 있도록 설정 */
+.input-group select,
+.input-group input {
+  min-width: 0;          /* flex 아이템이 내용물 때문에 밖으로 튀어나가는 현상 방지 (핵심!) */
+  flex: 1 1 150px;       /* 150px 이하로 좁아지면 유연하게 줄어들거나 다음 줄로 넘어감 */
+}
+
+.input-group button {
+  flex-shrink: 0;        /* 버튼 크기는 찌그러지지 않고 고정 */
+}
+

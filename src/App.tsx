@@ -2101,12 +2101,12 @@ export default function App() {
               <table className="attendance-table">
                 <thead>
                   <tr>
-                    <th>아이디</th>
+                    <th>ID</th>
                     <th>이름</th>
                     <th>분류</th>
-                    <th>접속 카운트 (전체 / 오늘)</th>
-                    <th>수동 등/하원 체크</th>
-                    <th>회원 관리</th>
+                    <th>접속(전체/오늘)</th>
+                    <th>수동체크</th>
+                    <th>탈퇴</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2125,7 +2125,7 @@ export default function App() {
                         <td>{CATEGORY_LABELS[u.category]}</td>
                         <td>
                           <span className="visit-badge-table">
-                            👁️ 전체: {u.totalVisits || 1}회 / 오늘: {u.lastVisitDate === todayStr ? (u.todayVisits || 1) : 0}회
+                            {u.totalVisits || 1}회/{u.lastVisitDate === todayStr ? (u.todayVisits || 1) : 0}회
                           </span>
                         </td>
                         <td>
@@ -2192,9 +2192,9 @@ export default function App() {
                     <th>날짜</th>
                     <th>주차</th>
                     <th>분류</th>
-                    <th>이름 (ID)</th>
-                    <th>등원 시간 (시:분)</th>
-                    <th>하원 시간 (시:분)</th>
+                    <th>이름(ID)</th>
+                    <th>등원시간</th>
+                    <th>하원시간</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2206,7 +2206,7 @@ export default function App() {
                       return (
                         <tr key={a.id}>
                           <td>{a.date}</td>
-                          <td>{getWeekNumber(d)}주차</td>
+                          <td>{getWeekNumber(d)}주</td>
                           <td>{CATEGORY_LABELS[a.userCategory]}</td>
                           <td>{a.userName} ({a.userId})</td>
                           <td><span className="badge-in">{a.checkIn}</span></td>
