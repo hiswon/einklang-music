@@ -1881,58 +1881,54 @@ export default function App() {
         {/* 관리자 통계 및 출석/회원 관리 / 학생 기록란 */}
         {activeTab === 'attendance' && currentUser?.role === 'ADMIN' && (
           <section className="tab-content text-left">
-            {currentUser?.role === 'ADMIN' && (
-              <>
-              {/* 1. 학생 기록란 (작성자 제거 & 5개 단위 페이지네이션 추가) */}
-              <h2>📝 학생기록란 (일일 특이사항 누적 작성)</h2>
-              <div className="student-note-management-box">
-                <div className="input-group mb-12">
-                  <select
-                    value={selectedStudentForNote}
-                    onChange={e => {
-                      setSelectedStudentForNote(e.target.value)
-                      setStudentNotePage(1)
-                    }}
-                    className="select-filter"
-                  >
-                    <option value="">-- 학생(원생) 선택 --</option>
-                    {users.filter(u => u.role !== 'ADMIN' && u.category !== 'GENERAL' && u.category !== 'PARENT').map(s => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({s.id} / {CATEGORY_LABELS[s.category]})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+            
+            {/* 1. 학생 기록란 (작성자 제거 & 5개 단위 페이지네이션 추가) */}
+            <h2>📝 학생기록란 (일일 특이사항 누적 작성)</h2>
+            <div className="student-note-management-box">
+              <div className="input-group mb-12">
+                <select
+                  value={selectedStudentForNote}
+                  onChange={e => {
+                    setSelectedStudentForNote(e.target.value)
+                    setStudentNotePage(1)
+                  }}
+                  className="select-filter"
+                >
+                  <option value="">-- 학생(원생) 선택 --</option>
+                  {users.filter(u => u.role !== 'ADMIN' && u.category !== 'GENERAL' && u.category !== 'PARENT').map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.id} / {CATEGORY_LABELS[s.category]})
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-                {selectedStudentForNote && (() => {
-                  const selectedUser = users.find(u => u.id === selectedStudentForNote)
-                  const notesList = selectedUser?.notes || []
-                  const totalNotePages = Math.ceil(notesList.length / ITEMS_PER_PAGE)
-                  const currentNotes = notesList.slice((studentNotePage - 1) * ITEMS_PER_PAGE, studentNotePage * ITEMS_PER_PAGE)
+              {selectedStudentForNote && (() => {
+                const selectedUser = users.find(u => u.id === selectedStudentForNote)
+                const notesList = selectedUser?.notes || []
+                const totalNotePages = Math.ceil(notesList.length / ITEMS_PER_PAGE)
+                const currentNotes = notesList.slice((studentNotePage - 1) * ITEMS_PER_PAGE, studentNotePage * ITEMS_PER_PAGE)
 
-                  return (
-                    <div className="note-write-container">
-                      <textarea
-                        rows={3}
-                        placeholder="해당 학생의 일일 특이사항, 수업 진도, 상담 내용 등을 입력하세요..."
-                        value={newNoteContent}
-                        onChange={e => setNewNoteContent(e.target.value)}
-                        className="input-field mb-12"
-                      />
-                      <button onClick={handleAddStudentNote} className="submit-post-btn mb-12">💾 특이사항 누적 저장</button>
+                return (
+                  <div className="note-write-container">
+                    <textarea
+                      rows={3}
+                      placeholder="해당 학생의 일일 특이사항, 수업 진도, 상담 내용 등을 입력하세요..."
+                      value={newNoteContent}
+                      onChange={e => setNewNoteContent(e.target.value)}
+                      className="input-field mb-12"
+                    />
+                    <button onClick={handleAddStudentNote} className="submit-post-btn mb-12">💾 특이사항 누적 저장</button>
 
-                      <h4>📋 [{selectedUser?.name}] 학생 누적 기록 목록</h4>
-                      <div className="notes-list">
-                        {notesList.length === 0 ? (
-                          <p className="empty-text">저장된 특이사항이 없습니다.</p>
-                        ) : (
-                          currentNotes.map(note => (
-                            <div key={note.id} className="note-card">
-                              <div className="note-header">
-                                <span className="note-date">📅 {note.date} ({note.createdAt})</span>
-                              </div>
-                              <p className="note-body">{note.content}</p>
-
+                    <h4>📋 [{selectedUser?.name}] 학생 누적 기록 목록</h4>
+                    <div className="notes-list">
+                      {notesList.length === 0 ? (
+                        <p className="empty-text">저장된 특이사항이 없습니다.</p>
+                      ) : (
+                        currentNotes.map(note => (
+                          <div key={note.id} className="note-card">
+                            <div className="note-header">
+                              <span className="note-date">📅 {note.date} ({note.createdAt})</span>
                               <button 
                                 className="btn-danger-sm" 
                                 onClick={() => handleDeleteStudentNote(selectedStudentForNote, note.id)}
@@ -1940,30 +1936,30 @@ export default function App() {
                                 삭제
                               </button>
                             </div>
-                          ))
-                        )}
-                      </div>
-
-                      {totalNotePages > 1 && (
-                        <div className="pagination-container mb-12">
-                          {Array.from({ length: totalNotePages }).map((_, idx) => (
-                            <button
-                              key={idx}
-                              className={`page-btn ${studentNotePage === idx + 1 ? 'active' : ''}`}
-                              onClick={() => setStudentNotePage(idx + 1)}
-                            >
-                              {idx + 1}
-                            </button>
-                          ))}
-                        </div>
+                            <p className="note-body">{note.content}</p>
+                          </div>
+                        ))
                       )}
                     </div>
-                  )
-                })()}
-              </div>
-              </>
-            )}
-            
+
+                    {totalNotePages > 1 && (
+                      <div className="pagination-container mb-12">
+                        {Array.from({ length: totalNotePages }).map((_, idx) => (
+                          <button
+                            key={idx}
+                            className={`page-btn ${studentNotePage === idx + 1 ? 'active' : ''}`}
+                            onClick={() => setStudentNotePage(idx + 1)}
+                          >
+                            {idx + 1}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+            </div>
+
             {/* 2. 공지사항 실시간 업데이트 반영 */}
             <h2>📢 회원 QR 바코드 밑 공지사항 작성</h2>
             <div className="notice-management-box">
