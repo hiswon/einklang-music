@@ -1857,7 +1857,7 @@ export default function App() {
                                         } else if (isToday) {
                                           return <span className="badge-pending">수업중</span>;
                                         } else {
-                                          return <span className="badge-danger" style={{ color: '#f87171' }}>체크안됨</span>;
+                                          return <span className="badge-danger" style={{ color: '#f87171' }}>체크<br className="mobile-break" />안됨</span>;
                                         }
                                       })()}
                                     </td>
@@ -2235,7 +2235,7 @@ export default function App() {
                                 } else if (isToday) {
                                   return <span className="badge-pending">수업중</span>;
                                 } else {
-                                  return <span className="badge-danger" style={{ color: '#f87171' }}>체크안됨</span>;
+                                  return <span className="badge-danger" style={{ color: '#f87171' }}>체크<br className="mobile-break" />안됨</span>;
                                 }
                               })()}
                           </td>
