@@ -2044,7 +2044,7 @@ export default function App() {
                 )
               })}
               <div className="count-card student-total">
-                <span className="cat-title">🎓 원생 수 (학생만)</span>
+                <span className="cat-title">🎓학생수</span>
                 <span className="cat-count">
                   {users.filter(u => u.role !== 'ADMIN' && u.category !== 'GENERAL' && u.category !== 'PARENT').length}명
                 </span>
