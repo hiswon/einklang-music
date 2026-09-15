@@ -1762,40 +1762,42 @@ export default function App() {
 
                   {renderUserNotices(targetUser, isParentView)}
 
-                  {/* 1. 작성자 제거 및 5개씩 페이지네이션이 적용된 누적 특이사항 조회 */}
-                  <div className="student-notes-box">
-                    <h3>📝 {isParentView ? `[${targetUser.name}] 자녀의 일일 누적 특이사항` : '나의 일일 누적 특이사항'}</h3>
-                    {userNotes.length === 0 ? (
-                      <p className="empty-text">등록된 특이사항 기록이 없습니다.</p>
-                    ) : (
-                      <>
-                        <div className="notes-list">
-                          {paginatedNotes.map(note => (
-                            <div key={note.id} className="note-card">
-                              <div className="note-header">
-                                <span className="note-date">📅 {note.date} ({note.createdAt})</span>
+                  {/* 학생 본인 접속시에만 누적 기록/특이사항 출력 (부모는 보이지 않음) */}
+                  {!isParentView && (
+                    <div className="student-notes-box">
+                      <h3>📝 나의 일일 누적 특이사항</h3>
+                      {userNotes.length === 0 ? (
+                        <p className="empty-text">등록된 특이사항 기록이 없습니다.</p>
+                      ) : (
+                        <>
+                          <div className="notes-list">
+                            {paginatedNotes.map(note => (
+                              <div key={note.id} className="note-card">
+                                <div className="note-header">
+                                  <span className="note-date">📅 {note.date} ({note.createdAt})</span>
+                                </div>
+                                <p className="note-body">{note.content}</p>
                               </div>
-                              <p className="note-body">{note.content}</p>
-                            </div>
-                          ))}
-                        </div>
-
-                        {totalNotePages > 1 && (
-                          <div className="pagination-container">
-                            {Array.from({ length: totalNotePages }).map((_, idx) => (
-                              <button
-                                key={idx}
-                                className={`page-btn ${studentNotePage === idx + 1 ? 'active' : ''}`}
-                                onClick={() => setStudentNotePage(idx + 1)}
-                              >
-                                {idx + 1}
-                              </button>
                             ))}
                           </div>
-                        )}
-                      </>
-                    )}
-                  </div>
+
+                          {totalNotePages > 1 && (
+                            <div className="pagination-container">
+                              {Array.from({ length: totalNotePages }).map((_, idx) => (
+                                <button
+                                  key={idx}
+                                  className={`page-btn ${studentNotePage === idx + 1 ? 'active' : ''}`}
+                                  onClick={() => setStudentNotePage(idx + 1)}
+                                >
+                                  {idx + 1}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
 
                   {(() => {
                     const myStats = attendanceAnalytics.studentStats.find(s => s.userId === targetUser.id)
